@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/transaction.dart';
 import '../models/credit_profile.dart';
+import '../models/loan.dart';
 import 'dart:convert';
 
 class DatabaseService {
@@ -22,7 +23,7 @@ class DatabaseService {
     String path = join(await getDatabasesPath(), 'kipepeo.db');
     return await openDatabase(
       path,
-      version: 4, // Upgraded for audit logs
+      version: 5, // Upgraded for loans
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -77,24 +78,69 @@ class DatabaseService {
         warnings TEXT
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE loans(
+        id TEXT PRIMARY KEY,
+        profileId TEXT,
+        principalAmount REAL,
+        interestRate REAL,
+        totalToRepay REAL,
+        amountPaid REAL,
+        issuedDate TEXT,
+        dueDate TEXT,
+        status TEXT
+      )
+    ''');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 3) {
-      await db.execute('CREATE TABLE IF NOT EXISTS anonymized_profiles(...)'); // Simplified for brevity
-    }
-    if (oldVersion < 4) {
+    if (oldVersion < 5) {
       await db.execute('''
-        CREATE TABLE IF NOT EXISTS audit_logs(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          profile_id TEXT,
-          timestamp TEXT,
-          score REAL,
-          decision TEXT,
-          warnings TEXT
+        CREATE TABLE IF NOT EXISTS loans(
+          id TEXT PRIMARY KEY,
+          profileId TEXT,
+          principalAmount REAL,
+          interestRate REAL,
+          totalToRepay REAL,
+          amountPaid REAL,
+          issuedDate TEXT,
+          dueDate TEXT,
+          status TEXT
         )
       ''');
     }
+  }
+
+  // --- Loan Methods ---
+  Future<void> saveLoan(Loan loan) async {
+    final db = await database;
+    await db.insert(
+      'loans',
+      loan.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<Loan>> getLoansForProfile(String profileId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'loans',
+      where: 'profileId = ?',
+      whereArgs: [profileId],
+    );
+    return maps.map((m) => Loan.fromMap(m)).toList();
+  }
+
+  Future<Loan?> getActiveLoan(String profileId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'loans',
+      where: 'profileId = ? AND status = ?',
+      whereArgs: [profileId, LoanStatus.active.name],
+    );
+    if (maps.isEmpty) return null;
+    return Loan.fromMap(maps.first);
   }
 
   // --- Audit Log Methods ---
@@ -114,7 +160,7 @@ class DatabaseService {
     return await db.query('audit_logs', orderBy: 'timestamp DESC');
   }
 
-  // --- Profile Methods (Existing) ---
+  // --- Profile Methods ---
   Future<void> saveProfile(CreditProfile profile, {bool isAnonymized = false}) async {
     final db = await database;
     final tableName = isAnonymized ? 'anonymized_profiles' : 'profiles';
@@ -133,7 +179,7 @@ class DatabaseService {
     return CreditProfile.fromMap(map);
   }
 
-  // --- Transaction Methods (Existing) ---
+  // --- Transaction Methods ---
   Future<void> insertTransaction(MobileTransaction tx) async {
     final db = await database;
     await db.insert('transactions', tx.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
