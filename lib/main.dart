@@ -57,7 +57,7 @@ class _DashboardState extends State<Dashboard> {
   CreditProfile? _currentProfile;
   GovernanceResult? _governanceResult;
   bool _isLoading = false;
-  String _status = 'Ready to fetch live data';
+  String _status = 'Ready to sync financial records';
 
   @override
   void initState() {
@@ -75,6 +75,14 @@ class _DashboardState extends State<Dashboard> {
         
         // Save real profile
         _dbService.saveProfile(_currentProfile!);
+        
+        // Phase 3: Audit Logging (Transparency)
+        _dbService.insertAuditLog(
+          _currentProfile!.id, 
+          _governanceResult!.finalScore, 
+          _governanceResult!.isApproved, 
+          _governanceResult!.warnings
+        );
         
         // Phase 3: Anonymize and save to privacy-safe store
         final anonProfile = _dpService.anonymize(_currentProfile!);
@@ -107,7 +115,7 @@ class _DashboardState extends State<Dashboard> {
       }
       await _loadStoredData();
       setState(() {
-        _status = 'Privacy-preserved profile updated.';
+        _status = 'Audit Log & Privacy Store Updated.';
       });
     } catch (e) {
       setState(() {
@@ -143,14 +151,24 @@ class _DashboardState extends State<Dashboard> {
               ],
               _buildPrivacyStatusCard(),
               const SizedBox(height: 20),
-              Text(
-                'Financial Activity History',
-                style: Theme.of(context).textTheme.titleLarge,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Financial Activity',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  TextButton.icon(
+                    onPressed: () => _showAuditLogs(context),
+                    icon: const Icon(Icons.history, size: 18),
+                    label: const Text('Audit Logs'),
+                  )
+                ],
               ),
               const SizedBox(height: 10),
               Expanded(
                 child: _transactions.isEmpty
-                    ? const Center(child: Text('No data found. Pull down to sync.'))
+                    ? const Center(child: Text('No data found. Sync to generate profile.'))
                     : ListView.separated(
                         itemCount: _transactions.length,
                         separatorBuilder: (context, index) => const Divider(height: 1, indent: 16, endIndent: 16),
@@ -187,6 +205,41 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 
+  void _showAuditLogs(BuildContext context) async {
+    final logs = await _dbService.getAuditLogs();
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Immutable Decision Logs', style: Theme.of(context).textTheme.headlineSmall),
+            const Text('Local transparency log for all credit decisions.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const Divider(),
+            Expanded(
+              child: ListView.builder(
+                itemCount: logs.length,
+                itemBuilder: (context, index) {
+                  final log = logs[index];
+                  return ListTile(
+                    title: Text('${log['decision']} - Score: ${(log['score'] * 100).toStringAsFixed(0)}'),
+                    subtitle: Text('ID: ${log['profile_id'].toString().substring(0, 8)}... • ${log['timestamp']}'),
+                    trailing: const Icon(Icons.lock, size: 16, color: Colors.grey),
+                  );
+                },
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildPrivacyStatusCard() {
     return Card(
       child: Padding(
@@ -204,13 +257,13 @@ class _DashboardState extends State<Dashboard> {
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const Text(
-                    'Differential Privacy Active (ε=1.0)',
+                    'Local Privacy Engine Active (ε=1.0)',
                     style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ],
               ),
             ),
-            if (_isLoading) const CircularProgressIndicator(strokeWidth: 2),
+            if (_isLoading) const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
           ],
         ),
       ),
