@@ -24,7 +24,7 @@ class DatabaseService {
     String path = join(await getDatabasesPath(), 'kipepeo.db');
     return await openDatabase(
       path,
-      version: 8,
+      version: 9, 
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -49,6 +49,7 @@ class DatabaseService {
         timestamp TEXT,
         type TEXT,
         reference TEXT,
+        category TEXT,
         rawBody TEXT
       )
     ''');
@@ -118,16 +119,8 @@ class DatabaseService {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 8) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS users(
-          id TEXT PRIMARY KEY,
-          phoneNumber TEXT UNIQUE,
-          fullName TEXT,
-          businessName TEXT,
-          password TEXT
-        )
-      ''');
+    if (oldVersion < 9) {
+      await db.execute('ALTER TABLE transactions ADD COLUMN category TEXT DEFAULT "General"');
     }
   }
 

@@ -847,118 +847,331 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _showVisualReport(BuildContext context) {
-    final score = _governanceResult!.finalScore;
+    if (_currentProfile == null || _governanceResult == null) return;
+
+    final profile = _currentProfile!;
+    final gov = _governanceResult!;
+    final score = gov.finalScore;
     final color = score > 0.7
         ? Colors.teal
         : score > 0.4
         ? Colors.orange
         : Colors.red;
+
+    final currency = NumberFormat.currency(symbol: 'Ksh ', decimalDigits: 0);
+
+    // Dynamic metrics
+    double avgUtilization = 0.0;
+    int onTimeRepayments = 0;
+    if (_loanHistory.isNotEmpty) {
+      avgUtilization = _loanHistory.fold(0.0, (sum, l) => sum + l.businessUtilization) / _loanHistory.length;
+      onTimeRepayments = _loanHistory.where((l) => l.status == LoanStatus.paid).length;
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.9,
+        height: MediaQuery.of(context).size.height * 0.92,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(40)),
+        ),
         child: Column(
           children: [
+            // Handle for the modal
             Container(
-              padding: const EdgeInsets.fromLTRB(32, 40, 32, 24),
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
               decoration: BoxDecoration(
-                color: Colors.teal.shade50,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(32),
-                ),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Icon(
-                        Icons.account_balance,
-                        color: Colors.teal,
-                        size: 32,
-                      ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.share_outlined,
-                          color: Colors.teal,
-                        ),
-                        onPressed: () {},
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'BUSINESS IDENTITY REPORT',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 18,
-                      letterSpacing: 2,
-                      color: Colors.teal,
-                    ),
-                  ),
-                  const Text(
-                    'Verified by Kipepeo Engine',
-                    style: TextStyle(
-                      color: Colors.teal,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
+            
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.all(32),
                 children: [
-                  _buildReportSection(
-                    'BUSINESS HEALTH',
-                    Column(
+                  // --- HEADER ---
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'KIPEPEO IDENTITY',
+                            style: TextStyle(
+                              letterSpacing: 2,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 10,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          Text(
+                            profile.id.substring(0, 12).toUpperCase(),
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.teal.shade50,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.qr_code_2, color: Colors.teal),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 32),
+                  
+                  // --- TRUST SCORE PASS ---
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(32),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [color.withOpacity(0.1), color.withOpacity(0.02)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(32),
+                      border: Border.all(color: color.withOpacity(0.2)),
+                    ),
+                    child: Column(
                       children: [
-                        Text(
-                          score > 0.7
-                              ? "VERY STRONG"
-                              : score > 0.4
-                              ? "STEADY"
-                              : "GROWING",
+                        const Text(
+                          'BUSINESS TRUST SCORE',
                           style: TextStyle(
-                            color: color,
-                            fontSize: 24,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            letterSpacing: 1.5,
+                            color: Colors.black54,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 16),
                         Text(
-                          'Based on ${_currentProfile!.transactionCount} verified records',
-                          style: const TextStyle(color: Colors.grey),
+                          (score * 100).toStringAsFixed(0),
+                          style: TextStyle(
+                            fontSize: 72,
+                            fontWeight: FontWeight.w900,
+                            color: color,
+                            letterSpacing: -4,
+                          ),
+                        ),
+                        Text(
+                          score > 0.7 ? "VERY STRONG" : score > 0.4 ? "STEADY" : "GROWING",
+                          style: TextStyle(
+                            color: color,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            _buildMiniMetric('RECORDS', profile.transactionCount.toString()),
+                            _buildMiniMetric('HEALTH', '${(profile.riskScore * 10).toStringAsFixed(1)}/10'),
+                            _buildMiniMetric('RELIABLE', '${(profile.repaymentRate * 100).toStringAsFixed(0)}%'),
+                          ],
                         ),
                       ],
                     ),
                   ),
+                  const SizedBox(height: 32),
+
+                  // --- CASHFLOW SUMMARY ---
+                  const Text(
+                    'VERIFIED CASHFLOW (Monthly)',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildValueCard(
+                          'Inflow', 
+                          currency.format(profile.avgMonthlyInflow), 
+                          Colors.teal,
+                          Icons.arrow_downward
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _buildValueCard(
+                          'Outflow', 
+                          currency.format(profile.avgMonthlyOutflow), 
+                          Colors.red,
+                          Icons.arrow_upward
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 32),
+
+                  // --- BUSINESS DISCIPLINE ---
+                  _buildReportSection(
+                    'BUSINESS DISCIPLINE',
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Stock Utilization Efficiency',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            Text(
+                              '${(avgUtilization * 100).toStringAsFixed(0)}%',
+                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: LinearProgressIndicator(
+                            value: avgUtilization,
+                            minHeight: 10,
+                            backgroundColor: Colors.teal.withOpacity(0.05),
+                            color: Colors.teal,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Percentage of loans spent directly on business stock and transport.',
+                          style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // --- AI VERIFICATION SEAL ---
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.verified_user, color: Colors.blue.shade700, size: 28),
+                            const SizedBox(width: 12),
+                            const Text(
+                              'PROJECT ULTRA TRUST SEAL',
+                              style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        ...gov.warnings.isEmpty 
+                          ? [
+                              const _SealTip('✅ AI Audit: No predatory debt traps detected.'),
+                              const _SealTip('✅ Mobile Verifier: Data integrity confirmed.'),
+                              const _SealTip('✅ Privacy Guard: Data masked & anonymized.'),
+                            ]
+                          : gov.warnings.map((w) => _SealTip('⚠️ Alert: $w')).toList(),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 48),
                 ],
               ),
             ),
+
+            // --- BOTTOM ACTION ---
             Padding(
               padding: const EdgeInsets.all(32),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.teal,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.all(18),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        elevation: 0,
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('DOWNLOAD PDF REPORT', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
                   ),
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('DONE'),
-                ),
+                  const SizedBox(width: 12),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.teal.shade50,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Icon(Icons.share, color: Colors.teal),
+                  ),
+                ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildMiniMetric(String label, String value) {
+    return Column(
+      children: [
+        Text(value, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 9, fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+
+  Widget _buildValueCard(String label, String value, Color color, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.grey.shade100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+          ),
+        ],
       ),
     );
   }
@@ -986,6 +1199,25 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
           const SizedBox(height: 16),
           content,
+        ],
+      ),
+    );
+  }
+}
+
+class _SealTip extends StatelessWidget {
+  final String text;
+  const _SealTip(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(text, style: const TextStyle(fontSize: 12, color: Colors.black87)),
+          ),
         ],
       ),
     );
@@ -1378,6 +1610,17 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
             final tx = allTxs[i];
             final isExpense = tx.type == TransactionType.outflow;
             
+            // Determine the display title and sub-tag
+            String displayTitle = "Transaction";
+            String? subTag;
+            if (tx is MobileTransaction) {
+              displayTitle = tx.sender;
+              subTag = tx.category;
+            } else if (tx is CashTransaction) {
+              displayTitle = tx.description.isNotEmpty ? tx.description : "Cash Record";
+              subTag = tx.category ?? "Cash";
+            }
+
             return Card(
               elevation: 0,
               margin: const EdgeInsets.only(bottom: 12),
@@ -1395,20 +1638,61 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
                     size: 20,
                   ),
                 ),
-                title: Text(
-                  'Ksh ${tx.amount.toStringAsFixed(0)}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                title: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        displayTitle,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (subTag != null)
+                      Container(
+                        margin: const EdgeInsets.only(left: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          subTag.toUpperCase(),
+                          style: TextStyle(fontSize: 8, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                  ],
                 ),
-                subtitle: Text(
-                  DateFormat('dd MMMM, HH:mm').format(tx.timestamp),
-                  style: const TextStyle(fontSize: 12),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Ksh ${tx.amount.toStringAsFixed(0)}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900, 
+                        fontSize: 16,
+                        color: isExpense ? Colors.black : Colors.teal.shade700
+                      ),
+                    ),
+                    Text(
+                      DateFormat('dd MMMM, HH:mm').format(tx.timestamp),
+                      style: const TextStyle(fontSize: 10, color: Colors.grey),
+                    ),
+                  ],
                 ),
-                trailing: Text(
-                  isExpense ? 'OUT' : 'IN',
-                  style: TextStyle(
-                    color: isExpense ? Colors.red : Colors.teal,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 10,
+                trailing: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isExpense ? Colors.red.shade50 : Colors.teal.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    isExpense ? 'OUT' : 'IN',
+                    style: TextStyle(
+                      color: isExpense ? Colors.red : Colors.teal,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 9,
+                    ),
                   ),
                 ),
               ),

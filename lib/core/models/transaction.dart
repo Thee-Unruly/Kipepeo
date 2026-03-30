@@ -16,6 +16,7 @@ class MobileTransaction implements FinancialTransaction {
   final DateTime timestamp;
   final TransactionType type;
   final String reference;
+  final String category;
   final String rawBody;
 
   MobileTransaction({
@@ -25,6 +26,7 @@ class MobileTransaction implements FinancialTransaction {
     required this.timestamp,
     required this.type,
     required this.reference,
+    required this.category,
     required this.rawBody,
   });
 
@@ -35,6 +37,7 @@ class MobileTransaction implements FinancialTransaction {
     'timestamp': timestamp.toIso8601String(),
     'type': type.name,
     'reference': reference,
+    'category': category,
     'rawBody': rawBody,
   };
 
@@ -45,6 +48,7 @@ class MobileTransaction implements FinancialTransaction {
     timestamp: DateTime.parse(map['timestamp']),
     type: TransactionType.values.byName(map['type']),
     reference: map['reference'],
+    category: map['category'] ?? 'General',
     rawBody: map['rawBody'],
   );
 }
