@@ -49,6 +49,8 @@ class _DashboardState extends State<Dashboard> {
   final FeatureService _featureService = FeatureService();
   final GovernanceService _governanceService = GovernanceService();
 
+  static const String _userPhoneNumber = '+2547XXXXXXXX'; // Placeholder
+
   List<MobileTransaction> _transactions = [];
   CreditProfile? _currentProfile;
   GovernanceResult? _governanceResult;
@@ -66,9 +68,24 @@ class _DashboardState extends State<Dashboard> {
     setState(() {
       _transactions = txs;
       if (txs.isNotEmpty) {
-        // Assuming a single user for now, using a placeholder phone number.
-        _currentProfile = _featureService.generateProfile('+2547XXXXXXXX', txs);
-        _governanceResult = _governanceService.evaluate(_currentProfile!);
+        _currentProfile = _featureService.generateProfile(_userPhoneNumber, txs);
+        _governanceResult = _governanceService.evaluate(_currentProfile!); // Evaluate with new profile
+        _dbService.saveProfile(_currentProfile!); // Save the newly generated profile
+      } else {
+        // If no transactions, try to load the last saved profile
+        // We need to generate the ID for the placeholder phone number to retrieve it.
+        final String profileId = _featureService.generateProfileId(_userPhoneNumber); // Using new method
+        _currentProfile = null; // Clear previous profile
+        _governanceResult = null; // Clear previous governance result
+        
+        _dbService.getProfile(profileId).then((storedProfile) {
+          setState(() {
+            _currentProfile = storedProfile;
+            if (_currentProfile != null) {
+              _governanceResult = _governanceService.evaluate(_currentProfile!); // Evaluate stored profile
+            }
+          });
+        });
       }
     });
   }
@@ -86,7 +103,7 @@ class _DashboardState extends State<Dashboard> {
         await _dbService.insertTransaction(tx);
       }
 
-      await _loadStoredData();
+      await _loadStoredData(); // Reloads data, generates, and saves profile
       setState(() {
         _status = 'Successfully synced ${liveTxs.length} new transactions.';
       });
