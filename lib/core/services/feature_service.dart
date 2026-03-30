@@ -68,6 +68,11 @@ class FeatureService {
     );
   }
 
+  /// Generates a consistent, hashed ID for a given phone number.
+  String generateProfileId(String phoneNumber) {
+    return _hashId(phoneNumber);
+  }
+
   double _calculateKenyanRiskScore(double inflow, double outflow, int business, int utility, int loans) {
     double score = 0.5; // Neutral starting point
 
