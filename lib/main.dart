@@ -1,69 +1,3 @@
-
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'core/services/sms_service.dart';
-import 'core/services/database_service.dart';
-import 'core/services/feature_service.dart';
-import 'core/services/governance_service.dart';
-import 'core/services/differential_privacy_service.dart';
-import 'core/services/prospectus_service.dart';
-import 'core/models/transaction.dart';
-import 'core/models/credit_profile.dart';
-import 'core/models/loan.dart';
-import 'core/models/user.dart';
-import 'package:intl/intl.dart';
-import 'dart:math';
-
-// --- TRANSACTION REVIEW SCREEN ---
-class TransactionReviewPage extends StatefulWidget {
-  final List<MobileTransaction> transactions;
-  final void Function(List<MobileTransaction>) onConfirm;
-  const TransactionReviewPage({super.key, required this.transactions, required this.onConfirm});
-
-  @override
-  State<TransactionReviewPage> createState() => _TransactionReviewPageState();
-}
-
-class _TransactionReviewPageState extends State<TransactionReviewPage> {
-  late List<bool> _selected;
-
-  @override
-  void initState() {
-    super.initState();
-    _selected = List<bool>.filled(widget.transactions.length, true);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Review Transactions')),
-      body: ListView.builder(
-        itemCount: widget.transactions.length,
-        itemBuilder: (context, i) {
-          final tx = widget.transactions[i];
-          return CheckboxListTile(
-            value: _selected[i],
-            onChanged: (val) => setState(() => _selected[i] = val ?? false),
-            title: Text('Ksh ${tx.amount.toStringAsFixed(0)} • ${tx.sender}'),
-            subtitle: Text(tx.rawBody),
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        icon: const Icon(Icons.check),
-        label: const Text('Confirm'),
-        onPressed: () {
-          final selectedTxs = [
-            for (int i = 0; i < widget.transactions.length; i++)
-              if (_selected[i]) widget.transactions[i]
-          ];
-          widget.onConfirm(selectedTxs);
-          Navigator.pop(context);
-        },
-      ),
-    );
-  }
-}
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'core/services/sms_service.dart';
@@ -120,7 +54,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   void initState() {
     super.initState();
-    // In a real app, we'd check a secure storage flag here
     setState(() => _isChecking = false);
   }
 
@@ -151,7 +84,7 @@ class LandingPage extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset('assets/butterfly.png', width: 80, height: 80),
+            const Icon(Icons.auto_awesome, size: 80, color: Colors.teal),
             const SizedBox(height: 24),
             const Text(
               'Kipepeo',
@@ -232,9 +165,7 @@ class _LoginPageState extends State<LoginPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: Image.asset('assets/butterfly.png', width: 64, height: 64),
-            ),
+            const Icon(Icons.auto_awesome, size: 64, color: Colors.teal),
             const SizedBox(height: 24),
             const Text(
               'Welcome Back',
@@ -317,9 +248,7 @@ class _SignupPageState extends State<SignupPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: Image.asset('assets/butterfly.png', width: 64, height: 64),
-            ),
+            const Icon(Icons.auto_awesome, size: 64, color: Colors.teal),
             const SizedBox(height: 24),
             const Text(
               'Join Kipepeo',
@@ -611,7 +540,7 @@ class _DashboardPageState extends State<DashboardPage> {
         padding: const EdgeInsets.all(32),
         child: Column(
           children: [
-            Image.asset('assets/butterfly.png', width: 64, height: 64),
+            const Icon(Icons.auto_awesome, size: 64, color: Colors.teal),
             const SizedBox(height: 16),
             Text(
               'Your Business Health',
@@ -662,7 +591,7 @@ class _DashboardPageState extends State<DashboardPage> {
             Text(
               hasData
                   ? "Your business is being tracked successfully."
-                  : "Welcome, {widget.user.fullName}! Sync data to begin.",
+                  : "Welcome, ${widget.user.fullName}! Sync data to begin.",
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontWeight: FontWeight.w500,
@@ -918,7 +847,6 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _showVisualReport(BuildContext context) {
-    final currency = NumberFormat.currency(symbol: 'Ksh ', decimalDigits: 0);
     final score = _governanceResult!.finalScore;
     final color = score > 0.7
         ? Colors.teal
@@ -1080,54 +1008,19 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 2,
-      child: Builder(
-        builder: (context) {
-          final tabController = DefaultTabController.of(context);
-          return Scaffold(
-            appBar: AppBar(
-              title: const Text('My Tracker'),
-              bottom: const TabBar(
-                tabs: [
-                  Tab(text: 'LOANS'),
-                  Tab(text: 'PAYMENTS'),
-                ],
-              ),
-            ),
-            body: TabBarView(
-              children: [_buildLoanList(), _buildTransactionLedger()],
-            ),
-            floatingActionButton: Builder(
-              builder: (context) {
-                final currentTab = tabController?.index ?? 0;
-                if (currentTab == 0) {
-                  // LOANS tab
-                  return FloatingActionButton.extended(
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add Loan'),
-                    onPressed: () {
-                      // TODO: Implement add loan dialog
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Add Loan tapped')),
-                      );
-                    },
-                  );
-                } else {
-                  // PAYMENTS tab
-                  return FloatingActionButton.extended(
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add Payment'),
-                    onPressed: () {
-                      // TODO: Implement add payment dialog
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Add Payment tapped')),
-                      );
-                    },
-                  );
-                }
-              },
-            ),
-          );
-        },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('My Tracker'),
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'LOANS'),
+              Tab(text: 'PAYMENTS'),
+            ],
+          ),
+        ),
+        body: TabBarView(
+          children: [_buildLoanList(), _buildTransactionLedger()],
+        ),
       ),
     );
   }
@@ -1219,6 +1112,57 @@ class PrivacySettingsPage extends StatelessWidget {
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
       subtitle: Text(sub),
       trailing: Switch(value: val, onChanged: (v) {}),
+    );
+  }
+}
+
+// --- TRANSACTION REVIEW SCREEN ---
+class TransactionReviewPage extends StatefulWidget {
+  final List<MobileTransaction> transactions;
+  final void Function(List<MobileTransaction>) onConfirm;
+  const TransactionReviewPage({super.key, required this.transactions, required this.onConfirm});
+
+  @override
+  State<TransactionReviewPage> createState() => _TransactionReviewPageState();
+}
+
+class _TransactionReviewPageState extends State<TransactionReviewPage> {
+  late List<bool> _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = List<bool>.filled(widget.transactions.length, true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Review Transactions')),
+      body: ListView.builder(
+        itemCount: widget.transactions.length,
+        itemBuilder: (context, i) {
+          final tx = widget.transactions[i];
+          return CheckboxListTile(
+            value: _selected[i],
+            onChanged: (val) => setState(() => _selected[i] = val ?? false),
+            title: Text('Ksh ${tx.amount.toStringAsFixed(0)} • ${tx.sender}'),
+            subtitle: Text(tx.rawBody),
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        icon: const Icon(Icons.check),
+        label: const Text('Confirm'),
+        onPressed: () {
+          final selectedTxs = [
+            for (int i = 0; i < widget.transactions.length; i++)
+              if (_selected[i]) widget.transactions[i]
+          ];
+          widget.onConfirm(selectedTxs);
+          Navigator.pop(context);
+        },
+      ),
     );
   }
 }
