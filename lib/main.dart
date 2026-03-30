@@ -24,6 +24,7 @@ class KipepeoApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Kipepeo Passport',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
         useMaterial3: true,
@@ -143,7 +144,6 @@ class _DashboardPageState extends State<DashboardPage> {
     final score = _governanceResult!.finalScore;
     final color = score > 0.7 ? Colors.teal : score > 0.4 ? Colors.orange : Colors.red;
     
-    // Friendly status labels
     String statusLabel = score > 0.7 ? "VERY STRONG" : score > 0.4 ? "STEADY" : "GROWING";
     String statusDesc = score > 0.7 
         ? "Your business is doing great! Banks will trust you."
@@ -212,50 +212,194 @@ class _DashboardPageState extends State<DashboardPage> {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         leading: const Icon(Icons.verified, color: Colors.white, size: 32),
-        title: const Text('Create My Official Report', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        subtitle: const Text('Checked by Governance Trust Mark', style: TextStyle(color: Colors.white70)),
-        onTap: () => _showProspectus(context),
+        title: const Text('View My Business Report', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        subtitle: const Text('Official report for Banks & SACCOs', style: TextStyle(color: Colors.white70)),
+        onTap: () => _showVisualReport(context),
       ),
     );
   }
 
-  void _showProspectus(BuildContext context) {
-    final prospectus = _prospectusService.generateProspectus(_currentProfile!, _governanceResult!, _loanHistory);
+  void _showVisualReport(BuildContext context) {
+    final currency = NumberFormat.currency(symbol: 'Ksh ', decimalDigits: 0);
+    final score = _governanceResult!.finalScore;
+    final color = score > 0.7 ? Colors.teal : score > 0.4 ? Colors.orange : Colors.red;
+    
+    // Calculate stats
+    double avgUtilization = 0.0;
+    int onTimeRepayments = 0;
+    if (_loanHistory.isNotEmpty) {
+      avgUtilization = _loanHistory.fold(0.0, (sum, l) => sum + l.businessUtilization) / _loanHistory.length;
+      onTimeRepayments = _loanHistory.where((l) => l.status == LoanStatus.paid).length;
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
       builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.8,
-        padding: const EdgeInsets.all(32),
+        height: MediaQuery.of(context).size.height * 0.9,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('My Business Report', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                    Text('Verified by Project Ultra Trust Mark', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold, fontSize: 10)),
-                  ],
-                ),
-                IconButton(icon: const Icon(Icons.share), onPressed: () {}),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(16)),
-                child: SingleChildScrollView(child: Text(prospectus, style: const TextStyle(fontFamily: 'monospace', fontSize: 11))),
+            // Header
+            Container(
+              padding: const EdgeInsets.fromLTRB(32, 40, 32, 24),
+              decoration: BoxDecoration(
+                color: Colors.teal.shade50,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Icon(Icons.auto_awesome, color: Colors.teal, size: 32),
+                      IconButton(
+                        icon: const Icon(Icons.share_outlined, color: Colors.teal),
+                        onPressed: () {
+                           final text = _prospectusService.generateProspectus(_currentProfile!, _governanceResult!, _loanHistory);
+                           Clipboard.setData(ClipboardData(text: text));
+                           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Report copied! Share it on WhatsApp.')));
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('BUSINESS IDENTITY REPORT', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 2, color: Colors.teal)),
+                  const Text('Verified by Kipepeo Engine', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.w500)),
+                ],
               ),
             ),
-            const SizedBox(height: 24),
-            SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('DONE'))),
+            
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.all(32),
+                children: [
+                  // Health Card
+                  _buildReportSection(
+                    'BUSINESS HEALTH',
+                    Column(
+                      children: [
+                        Text(score > 0.7 ? "VERY STRONG" : score > 0.4 ? "STEADY" : "GROWING", 
+                            style: TextStyle(color: color, fontSize: 24, fontWeight: FontWeight.w900)),
+                        const SizedBox(height: 8),
+                        Text('Based on ${_currentProfile!.transactionCount} verified records', style: const TextStyle(color: Colors.grey)),
+                      ],
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 24),
+                  
+                  // Stats Grid
+                  Row(
+                    children: [
+                      Expanded(child: _buildStatTile('CASH FLOW', currency.format(_currentProfile!.avgMonthlyInflow), Icons.trending_up)),
+                      const SizedBox(width: 16),
+                      Expanded(child: _buildStatTile('DISCIPLINE', '$onTimeRepayments Paid', Icons.verified)),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _buildStatTile('BUSINESS USAGE', '${(avgUtilization * 100).toStringAsFixed(0)}% of funds used for stock', Icons.shopping_cart),
+                  
+                  const SizedBox(height: 24),
+                  
+                  // Trust Seal
+                  _buildReportSection(
+                    'PROJECT ULTRA TRUST SEAL',
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.shield, color: Colors.teal, size: 20),
+                            SizedBox(width: 8),
+                            Text('Audit Verified', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        ...(_governanceResult!.warnings.isEmpty 
+                          ? [const Text('• No risky debt patterns detected', style: TextStyle(fontSize: 13))]
+                          : _governanceResult!.warnings.map((w) => Text('• $w', style: const TextStyle(fontSize: 13)))),
+                      ],
+                    ),
+                    color: Colors.teal.shade50.withOpacity(0.5),
+                  ),
+                  
+                  const SizedBox(height: 24),
+                  
+                  // Lender Note
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade300)),
+                    child: Column(
+                      children: [
+                        const Icon(Icons.info_outline, color: Colors.grey),
+                        const SizedBox(height: 12),
+                        const Text('WHY TRUST THIS BUSINESS?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
+                        const SizedBox(height: 8),
+                        Text('This borrower uses ${ (avgUtilization * 100).toStringAsFixed(0) }% of their loans directly on business stock. They are a professional, de-risked trader.', 
+                             textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            Padding(
+              padding: const EdgeInsets.all(32),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.all(16)),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('DONE'),
+                ),
+              ),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildReportSection(String title, Widget content, {Color? color}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: color ?? Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10, letterSpacing: 1, color: Colors.grey)),
+          const SizedBox(height: 16),
+          content,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatTile(String label, String value, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: Colors.teal, size: 20),
+          const SizedBox(height: 12),
+          Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        ],
       ),
     );
   }
