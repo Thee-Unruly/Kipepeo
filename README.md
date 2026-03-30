@@ -15,8 +15,8 @@ Implements a localized version of your AI Quality Governance Layer to ensure bia
 ### 🔒 Differential Privacy
 Employs noise-injection techniques to ensure that individual financial records remain private even during model retraining cycles.
 
-### 🔄 Hybrid Synchronization
-Uses a Vector Database (Milvus Lite) for local similarity searches of credit profiles, syncing with the central cloud only when a stable connection is detected.
+### 🛡️ Offline-First Logic
+Ensures that the entire loan lifecycle—from scoring to contract generation and repayment tracking—happens entirely on the device.
 
 ---
 
@@ -37,11 +37,12 @@ Uses a Vector Database (Milvus Lite) for local similarity searches of credit pro
 - [x] **Noise Injection**: Add a Differential Privacy module to "fuzz" sensitive financial aggregates before any cloud sync.
 - [x] **Audit Logs**: Local immutable logs for transparency in scoring decisions.
 
-### Phase 4: Hybrid Sync & Offline Logic
-- [ ] **Connectivity Manager**: Monitor network states to trigger background sync.
-- [ ] **Delta Sync**: Only upload non-sensitive model gradients or anonymized vector updates.
-- [ ] **Conflict Resolution**: Logic for merging local profile updates with central records.
+### Phase 4: Offline Business Logic (The Loan Lifecycle)
+- [ ] **Repayment Tracker**: Monitor SMS for loan repayment confirmation (e.g., "Paid back 500 Ksh").
+- [ ] **Loan Calculator**: Local interest rate calculation and repayment scheduling.
+- [ ] **Contract Builder**: Generate a local summary/shareable agreement for the borrower.
 
 ### Phase 5: Agent Interface (UI/UX)
-- [ ] **Instant Decision Dashboard**: 5-second visualization of creditworthiness.
-- [ ] **Offline-First UI**: Ensure the app remains fully functional without an internet connection.
+- [x] **Navigation Hub**: 3-page layout (Hub, Vault, Shield) for professional agent use.
+- [x] **Instant Decision Dashboard**: 5-second visualization of creditworthiness.
+- [ ] **Loan Application Flow**: Interactive UI to apply for and track a loan locally.

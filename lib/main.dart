@@ -25,316 +25,239 @@ class KipepeoApp extends StatelessWidget {
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.teal,
           foregroundColor: Colors.white,
-          elevation: 4,
+          elevation: 0,
         ),
-        cardTheme: CardThemeData(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          elevation: 2,
-        )
       ),
-      home: const Dashboard(),
+      home: const MainNavigation(),
     );
   }
 }
 
-class Dashboard extends StatefulWidget {
-  const Dashboard({super.key});
+class MainNavigation extends StatefulWidget {
+  const MainNavigation({super.key});
 
   @override
-  State<Dashboard> createState() => _DashboardState();
+  State<MainNavigation> createState() => _MainNavigationState();
 }
 
-class _DashboardState extends State<Dashboard> {
+class _MainNavigationState extends State<MainNavigation> {
+  int _selectedIndex = 0;
+  
+  final List<Widget> _pages = [
+    const DashboardPage(),
+    const AuditHistoryPage(),
+    const PrivacySettingsPage(),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: _pages,
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: (index) => setState(() => _selectedIndex = index),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: 'Hub'),
+          NavigationDestination(icon: Icon(Icons.history_outlined), selectedIcon: Icon(Icons.history), label: 'Vault'),
+          NavigationDestination(icon: Icon(Icons.shield_outlined), selectedIcon: Icon(Icons.shield), label: 'Shield'),
+        ],
+      ),
+    );
+  }
+}
+
+// --- PAGE 1: HUB (DASHBOARD) ---
+class DashboardPage extends StatefulWidget {
+  const DashboardPage({super.key});
+
+  @override
+  State<DashboardPage> createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends State<DashboardPage> {
   final SmsService _smsService = SmsService();
   final DatabaseService _dbService = DatabaseService();
   final FeatureService _featureService = FeatureService();
   final GovernanceService _governanceService = GovernanceService();
   final DifferentialPrivacyService _dpService = DifferentialPrivacyService();
 
-  static const String _userPhoneNumber = '+2547XXXXXXXX';
-
-  List<MobileTransaction> _transactions = [];
   CreditProfile? _currentProfile;
   GovernanceResult? _governanceResult;
   bool _isLoading = false;
-  String _status = 'Ready to sync financial records';
+  String _status = 'Awaiting Sync';
 
   @override
   void initState() {
     super.initState();
-    _loadStoredData();
+    _loadData();
   }
 
-  Future<void> _loadStoredData() async {
+  Future<void> _loadData() async {
     final txs = await _dbService.getTransactions();
-    setState(() {
-      _transactions = txs;
-      if (txs.isNotEmpty) {
-        _currentProfile = _featureService.generateProfile(_userPhoneNumber, txs);
-        _governanceResult = _governanceService.evaluate(_currentProfile!);
-        
-        // Save real profile
-        _dbService.saveProfile(_currentProfile!);
-        
-        // Phase 3: Audit Logging (Transparency)
-        _dbService.insertAuditLog(
-          _currentProfile!.id, 
-          _governanceResult!.finalScore, 
-          _governanceResult!.isApproved, 
-          _governanceResult!.warnings
-        );
-        
-        // Phase 3: Anonymize and save to privacy-safe store
-        final anonProfile = _dpService.anonymize(_currentProfile!);
-        _dbService.saveProfile(anonProfile, isAnonymized: true);
-        
-      } else {
-        final String profileId = _featureService.generateProfileId(_userPhoneNumber);
-        _dbService.getProfile(profileId).then((storedProfile) {
-          setState(() {
-            _currentProfile = storedProfile;
-            if (_currentProfile != null) {
-              _governanceResult = _governanceService.evaluate(_currentProfile!);
-            }
-          });
-        });
-      }
-    });
-  }
-
-  Future<void> _fetchLiveData() async {
-    setState(() {
-      _isLoading = true;
-      _status = 'Syncing M-Pesa records...';
-    });
-
-    try {
-      final liveTxs = await _smsService.fetchInboxTransactions();
-      for (var tx in liveTxs) {
-        await _dbService.insertTransaction(tx);
-      }
-      await _loadStoredData();
+    if (txs.isNotEmpty) {
+      final profile = _featureService.generateProfile('+2547XXXXXXXX', txs);
+      final gov = _governanceService.evaluate(profile);
       setState(() {
-        _status = 'Audit Log & Privacy Store Updated.';
+        _currentProfile = profile;
+        _governanceResult = gov;
       });
-    } catch (e) {
-      setState(() {
-        _status = 'Error: ${e.toString()}';
-      });
-    } finally {
-      setState(() => _isLoading = false);
+      _dbService.saveProfile(profile);
+      _dbService.insertAuditLog(profile.id, gov.finalScore, gov.isApproved, gov.warnings);
+      _dbService.saveProfile(_dpService.anonymize(profile), isAnonymized: true);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Kipepeo Engine'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _fetchLiveData,
+      appBar: AppBar(title: const Text('Kipepeo Hub')),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            if (_governanceResult != null) _buildRiskCard(),
+            const SizedBox(height: 20),
+            _buildActionCard(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRiskCard() {
+    final score = _governanceResult!.finalScore;
+    final color = score > 0.7 ? Colors.teal : score > 0.4 ? Colors.orange : Colors.red;
+    return Card(
+      elevation: 0,
+      color: color.withOpacity(0.05),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(color: color.withOpacity(0.2)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          children: [
+            Text('Kipepeo Score', style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+            Text((score * 100).toStringAsFixed(0), 
+                style: TextStyle(fontSize: 84, fontWeight: FontWeight.w900, color: color, letterSpacing: -4)),
+            Text(_governanceResult!.isApproved ? 'READY TO LEND' : 'HIGH RISK', 
+                style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2, color: color)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionCard() {
+    return Card(
+      elevation: 0,
+      color: Colors.grey.shade100,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        title: const Text('Sync Financial Records', style: TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(_status),
+        trailing: _isLoading 
+          ? const CircularProgressIndicator() 
+          : CircleAvatar(
+              backgroundColor: Colors.teal,
+              child: IconButton(
+                icon: const Icon(Icons.refresh, color: Colors.white),
+                onPressed: () async {
+                  setState(() { _isLoading = true; _status = 'Scanning SMS...'; });
+                  final txs = await _smsService.fetchInboxTransactions();
+                  for (var tx in txs) { await _dbService.insertTransaction(tx); }
+                  await _loadData();
+                  setState(() { _isLoading = false; _status = 'Records Updated'; });
+                },
+              ),
+            ),
+      ),
+    );
+  }
+}
+
+// --- PAGE 2: VAULT (HISTORY) ---
+class AuditHistoryPage extends StatelessWidget {
+  const AuditHistoryPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final db = DatabaseService();
+    return Scaffold(
+      appBar: AppBar(title: const Text('Decision Vault')),
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: db.getAuditLogs(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) return const LinearProgressIndicator();
+          final logs = snapshot.data!;
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: logs.length,
+            itemBuilder: (context, i) {
+              final log = logs[i];
+              final isApproved = log['decision'] == 'APPROVED';
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ListTile(
+                  leading: Icon(isApproved ? Icons.verified : Icons.warning, 
+                               color: isApproved ? Colors.teal : Colors.red),
+                  title: Text('Score: ${(log['score'] * 100).toStringAsFixed(0)}'),
+                  subtitle: Text(log['timestamp'].toString().split('T')[0]),
+                  trailing: const Icon(Icons.chevron_right),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+// --- PAGE 3: SHIELD (PRIVACY) ---
+class PrivacySettingsPage extends StatelessWidget {
+  const PrivacySettingsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Privacy Shield')),
+      body: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          const Text('Kipepeo uses On-Device Differential Privacy to protect your financial footprint.', 
+                     style: TextStyle(color: Colors.grey)),
+          const SizedBox(height: 24),
+          _buildToggleTile('Differential Privacy', 'Active (ε=1.0)', true),
+          _buildToggleTile('Edge Inference', 'Decision made on-device', true),
+          _buildToggleTile('Anonymized Sync', 'Pending connection', false),
+          const SizedBox(height: 40),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade50,
+              foregroundColor: Colors.red,
+              elevation: 0,
+              padding: const EdgeInsets.all(16),
+            ),
+            onPressed: () {}, 
+            child: const Text('Purge All Local Data'),
           )
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _fetchLiveData,
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (_governanceResult != null) ...[
-                _buildRiskCard(context),
-                const SizedBox(height: 16),
-              ],
-              _buildPrivacyStatusCard(),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Financial Activity',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  TextButton.icon(
-                    onPressed: () => _showAuditLogs(context),
-                    icon: const Icon(Icons.history, size: 18),
-                    label: const Text('Audit Logs'),
-                  )
-                ],
-              ),
-              const SizedBox(height: 10),
-              Expanded(
-                child: _transactions.isEmpty
-                    ? const Center(child: Text('No data found. Sync to generate profile.'))
-                    : ListView.separated(
-                        itemCount: _transactions.length,
-                        separatorBuilder: (context, index) => const Divider(height: 1, indent: 16, endIndent: 16),
-                        itemBuilder: (context, index) {
-                          final tx = _transactions[index];
-                          return ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: tx.type == 'CREDIT' ? Colors.green.shade50 : Colors.red.shade50,
-                              child: Icon(
-                                tx.type == 'CREDIT' ? Icons.arrow_downward : Icons.arrow_upward,
-                                color: tx.type == 'CREDIT' ? Colors.green.shade700 : Colors.red.shade700,
-                                size: 20,
-                              ),
-                            ),
-                            title: Text(
-                              '${tx.type == 'CREDIT' ? '+' : '-'} Ksh ${tx.amount.toStringAsFixed(2)}',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: tx.type == 'CREDIT' ? Colors.green.shade700 : Colors.red.shade700,
-                              ),
-                            ),
-                            subtitle: Text(
-                              '${tx.reference} • ${tx.timestamp.toLocal().toString().split('.')[0]}',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          );
-                        },
-                      ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
-  void _showAuditLogs(BuildContext context) async {
-    final logs = await _dbService.getAuditLogs();
-    if (!mounted) return;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.7,
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Immutable Decision Logs', style: Theme.of(context).textTheme.headlineSmall),
-            const Text('Local transparency log for all credit decisions.', style: TextStyle(fontSize: 12, color: Colors.grey)),
-            const Divider(),
-            Expanded(
-              child: ListView.builder(
-                itemCount: logs.length,
-                itemBuilder: (context, index) {
-                  final log = logs[index];
-                  return ListTile(
-                    title: Text('${log['decision']} - Score: ${(log['score'] * 100).toStringAsFixed(0)}'),
-                    subtitle: Text('ID: ${log['profile_id'].toString().substring(0, 8)}... • ${log['timestamp']}'),
-                    trailing: const Icon(Icons.lock, size: 16, color: Colors.grey),
-                  );
-                },
-              ),
-            )
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPrivacyStatusCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          children: [
-            const Icon(Icons.security, color: Colors.teal),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _status,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const Text(
-                    'Local Privacy Engine Active (ε=1.0)',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                ],
-              ),
-            ),
-            if (_isLoading) const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRiskCard(BuildContext context) {
-    final score = _governanceResult!.finalScore;
-    final theme = Theme.of(context);
-
-    Color decisionColor;
-    IconData decisionIcon;
-    if (score > 0.7) {
-      decisionColor = theme.colorScheme.primary;
-      decisionIcon = Icons.check_circle_outline;
-    } else if (score > 0.4) {
-      decisionColor = theme.colorScheme.tertiary;
-      decisionIcon = Icons.info_outline;
-    } else {
-      decisionColor = theme.colorScheme.error;
-      decisionIcon = Icons.cancel_outlined;
-    }
-
-    return Container(
-      decoration: ShapeDecoration(
-        color: theme.colorScheme.surfaceContainerHigh,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: decisionColor.withOpacity(0.5), width: 1.5),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Icon(decisionIcon, color: decisionColor, size: 24),
-                    const SizedBox(width: 10),
-                    Text(
-                      'Kipepeo Risk Score',
-                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-                Text(
-                  (score * 100).toStringAsFixed(0),
-                  style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w900, color: decisionColor),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Decision: ${_governanceResult!.isApproved ? "APPROVED" : "REJECTED"}',
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: decisionColor),
-            ),
-            if (_governanceResult!.warnings.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Text(
-                'Governance Warnings:',
-                style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              ..._governanceResult!.warnings.map((w) => Text('• $w', style: theme.textTheme.bodySmall)),
-            ]
-          ],
-        ),
-      ),
+  Widget _buildToggleTile(String title, String sub, bool val) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+      subtitle: Text(sub),
+      trailing: Switch(value: val, onChanged: (v) {}),
     );
   }
 }
