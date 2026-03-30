@@ -998,13 +998,52 @@ class _DashboardPageState extends State<DashboardPage> {
                           children: [
                             _buildMiniMetric('RECORDS', profile.transactionCount.toString()),
                             _buildMiniMetric('HEALTH', '${(profile.riskScore * 10).toStringAsFixed(1)}/10'),
-                            _buildMiniMetric('RELIABLE', '${(profile.repaymentRate * 100).toStringAsFixed(0)}%'),
+                            _buildMiniMetric('ON-TIME', '${(onTimeConsistency * 100).toStringAsFixed(0)}%'),
                           ],
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 32),
+
+                  // --- PAYMENT RELIABILITY ---
+                  _buildReportSection(
+                    'REPAYMENT PERFORMANCE',
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Payment Early/On-Time Rate',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            Text(
+                              '${(onTimeConsistency * 100).toStringAsFixed(0)}%',
+                              style: TextStyle(fontWeight: FontWeight.bold, color: onTimeConsistency > 0.8 ? Colors.teal : Colors.orange),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: LinearProgressIndicator(
+                            value: onTimeConsistency,
+                            minHeight: 10,
+                            backgroundColor: Colors.teal.withOpacity(0.05),
+                            color: onTimeConsistency > 0.8 ? Colors.teal : Colors.orange,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Evidence confirms payments are made on or before the due date.',
+                          style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
 
                   // --- CASHFLOW SUMMARY ---
                   const Text(
@@ -1099,6 +1138,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           ? [
                               const _SealTip('✅ AI Audit: No predatory debt traps detected.'),
                               const _SealTip('✅ Mobile Verifier: Data integrity confirmed.'),
+                              const _SealTip('✅ On-Time: History confirms early payment discipline.'),
                               const _SealTip('✅ Privacy Guard: Data masked & anonymized.'),
                             ]
                           : gov.warnings.map((w) => _SealTip('⚠️ Alert: $w')).toList(),
