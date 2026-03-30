@@ -253,7 +253,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Icon(Icons.auto_awesome, color: Colors.teal, size: 32),
+                      const Icon(Icons.account_balance, color: Colors.teal, size: 32),
                       IconButton(
                         icon: const Icon(Icons.share_outlined, color: Colors.teal),
                         onPressed: () {
