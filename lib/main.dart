@@ -85,7 +85,7 @@ class LandingPage extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.auto_awesome, size: 80, color: Colors.teal),
+            Image.asset('assets/butterfly.png', width: 80, height: 80),
             const SizedBox(height: 24),
             const Text(
               'Kipepeo',
@@ -166,6 +166,10 @@ class _LoginPageState extends State<LoginPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Center(
+              child: Image.asset('assets/butterfly.png', width: 64, height: 64),
+            ),
+            const SizedBox(height: 24),
             const Text(
               'Welcome Back',
               style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
@@ -247,6 +251,10 @@ class _SignupPageState extends State<SignupPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Center(
+              child: Image.asset('assets/butterfly.png', width: 64, height: 64),
+            ),
+            const SizedBox(height: 24),
             const Text(
               'Join Kipepeo',
               style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
