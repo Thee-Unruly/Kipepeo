@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/transaction.dart';
 import '../models/credit_profile.dart';
+import 'dart:convert'; // For JSON encoding/decoding
 
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
@@ -83,9 +84,13 @@ class DatabaseService {
   // --- Profile Methods ---
   Future<void> saveProfile(CreditProfile profile) async {
     final db = await database;
+    // Convert embedding (List<double>) to a JSON string for storage
+    final Map<String, dynamic> data = profile.toMap();
+    data['embedding'] = json.encode(profile.embedding);
+
     await db.insert(
       'profiles',
-      profile.toMap(),
+      data,
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
@@ -99,12 +104,21 @@ class DatabaseService {
     );
 
     if (maps.isEmpty) return null;
-    return CreditProfile.fromMap(maps.first);
+    
+    // Convert embedding JSON string back to List<double>
+    final Map<String, dynamic> map = Map<String, dynamic>.from(maps.first);
+    map['embedding'] = List<double>.from(json.decode(map['embedding'] as String));
+
+    return CreditProfile.fromMap(map);
   }
 
   Future<List<CreditProfile>> getAllProfiles() async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query('profiles');
-    return maps.map((m) => CreditProfile.fromMap(m)).toList();
+    return maps.map((m) {
+      final Map<String, dynamic> map = Map<String, dynamic>.from(m);
+      map['embedding'] = List<double>.from(json.decode(map['embedding'] as String));
+      return CreditProfile.fromMap(map);
+    }).toList();
   }
 }
