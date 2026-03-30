@@ -189,11 +189,29 @@ class _DashboardState extends State<Dashboard> {
 
   Widget _buildRiskCard(BuildContext context) {
     final score = _governanceResult!.finalScore;
-    final color = score > 0.7 ? Colors.green : score > 0.4 ? Colors.orange : Colors.red;
     final theme = Theme.of(context);
 
-    return Card(
-      color: color.withOpacity(0.1),
+    Color decisionColor;
+    IconData decisionIcon;
+    if (score > 0.7) {
+      decisionColor = theme.colorScheme.primary;
+      decisionIcon = Icons.check_circle_outline;
+    } else if (score > 0.4) {
+      decisionColor = theme.colorScheme.tertiary;
+      decisionIcon = Icons.info_outline;
+    } else {
+      decisionColor = theme.colorScheme.error;
+      decisionIcon = Icons.cancel_outlined;
+    }
+
+    return Container(
+      decoration: ShapeDecoration(
+        color: theme.colorScheme.surfaceContainerHigh,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: decisionColor.withOpacity(0.5), width: 1.5),
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
@@ -202,20 +220,26 @@ class _DashboardState extends State<Dashboard> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Kipepeo Risk Score',
-                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
+                Row(
+                  children: [
+                    Icon(decisionIcon, color: decisionColor, size: 24),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Kipepeo Risk Score',
+                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
+                    ),
+                  ],
                 ),
                 Text(
                   (score * 100).toStringAsFixed(0),
-                  style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w900, color: color),
+                  style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w900, color: decisionColor),
                 ),
               ],
             ),
             const SizedBox(height: 12),
             Text(
               'Decision: ${_governanceResult!.isApproved ? "APPROVED" : "REJECTED"}',
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: color),
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: decisionColor),
             ),
             if (_governanceResult!.warnings.isNotEmpty) ...[
               const SizedBox(height: 16),
