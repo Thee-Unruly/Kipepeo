@@ -38,11 +38,11 @@ Ensures that the entire loan lifecycle—from scoring to contract generation and
 - [x] **Audit Logs**: Local immutable logs for transparency in scoring decisions.
 
 ### Phase 4: Offline Business Logic (The Loan Lifecycle)
-- [ ] **Repayment Tracker**: Monitor SMS for loan repayment confirmation (e.g., "Paid back 500 Ksh").
-- [ ] **Loan Calculator**: Local interest rate calculation and repayment scheduling.
-- [ ] **Contract Builder**: Generate a local summary/shareable agreement for the borrower.
+- [x] **Repayment Tracker**: Monitor SMS for loan repayment confirmation (e.g., "Paid back 500 Ksh").
+- [x] **Loan Calculator**: Local interest rate calculation and repayment scheduling.
+- [x] **Contract Builder**: Generate a local summary/shareable agreement for the borrower.
 
 ### Phase 5: Agent Interface (UI/UX)
 - [x] **Navigation Hub**: 3-page layout (Hub, Vault, Shield) for professional agent use.
 - [x] **Instant Decision Dashboard**: 5-second visualization of creditworthiness.
-- [ ] **Loan Application Flow**: Interactive UI to apply for and track a loan locally.
+- [x] **Loan Application Flow**: Interactive UI to apply for and track a loan locally.
