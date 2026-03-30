@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'core/services/sms_service.dart';
 import 'core/services/database_service.dart';
-import 'core/services/vector_search_service.dart';
 import 'core/models/transaction.dart';
 import 'core/models/credit_profile.dart';
 
@@ -21,98 +20,113 @@ class KipepeoApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
         useMaterial3: true,
       ),
-      home: const SimulationDashboard(),
+      home: const Dashboard(),
     );
   }
 }
 
-class SimulationDashboard extends StatefulWidget {
-  const SimulationDashboard({super.key});
+class Dashboard extends StatefulWidget {
+  const Dashboard({super.key});
 
   @override
-  State<SimulationDashboard> createState() => _SimulationDashboardState();
+  State<Dashboard> createState() => _DashboardState();
 }
 
-class _SimulationDashboardState extends State<SimulationDashboard> {
+class _DashboardState extends State<Dashboard> {
   final SmsService _smsService = SmsService();
   final DatabaseService _dbService = DatabaseService();
-  final VectorSearchService _vectorSearch = VectorSearchService();
 
   List<MobileTransaction> _transactions = [];
-  List<CreditProfile> _profiles = [];
-  String _status = 'Ready to simulate';
+  bool _isLoading = false;
+  String _status = 'Ready to fetch live data';
 
-  Future<void> _runSimulation() async {
-    setState(() => _status = 'Simulating Phase 1...');
+  @override
+  void initState() {
+    super.initState();
+    _loadStoredData();
+  }
 
-    // 1. Get Mock Transactions
-    final mocks = _smsService.getMockTransactions();
-    
-    // 2. Save to DB
-    for (var tx in mocks) {
-      await _dbService.insertTransaction(tx);
-    }
-
-    // 3. Create a Mock Credit Profile for "Mama Mboga"
-    final mockProfile = CreditProfile(
-      id: 'hash_mama_mboga',
-      riskScore: 0.85,
-      lastUpdated: DateTime.now(),
-      avgMonthlyInflow: 50000.0,
-      avgMonthlyOutflow: 30000.0,
-      repaymentRate: 0.98,
-      transactionCount: 150,
-      embedding: [0.1, 0.5, -0.2, 0.9, 0.4], // Mock 5D embedding
-    );
-    await _dbService.saveProfile(mockProfile);
-
-    // 4. Refresh Data
-    final savedTxs = await _dbService.getTransactions();
-    final savedProfiles = await _dbService.getAllProfiles();
-
+  Future<void> _loadStoredData() async {
+    final txs = await _dbService.getTransactions();
     setState(() {
-      _transactions = savedTxs;
-      _profiles = savedProfiles;
-      _status = 'Simulation Complete!';
+      _transactions = txs;
     });
+  }
+
+  Future<void> _fetchLiveData() async {
+    setState(() {
+      _isLoading = true;
+      _status = 'Fetching and parsing SMS...';
+    });
+
+    try {
+      final liveTxs = await _smsService.fetchInboxTransactions();
+      
+      for (var tx in liveTxs) {
+        await _dbService.insertTransaction(tx);
+      }
+
+      await _loadStoredData();
+      setState(() {
+        _status = 'Successfully synced ${liveTxs.length} new transactions.';
+      });
+    } catch (e) {
+      setState(() {
+        _status = 'Error: ${e.toString()}';
+      });
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Kipepeo: Phase 1 Simulation')),
+      appBar: AppBar(
+        title: const Text('Kipepeo Engine'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _isLoading ? null : _fetchLiveData,
+          )
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Status: $_status', style: const TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _runSimulation,
-              child: const Text('Start Phase 1 Simulation'),
-            ),
-            const Divider(),
-            const Text('Local Transactions:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            Expanded(
-              child: ListView.builder(
-                itemCount: _transactions.length,
-                itemBuilder: (context, index) {
-                  final tx = _transactions[index];
-                  return ListTile(
-                    title: Text('${tx.type}: Ksh ${tx.amount}'),
-                    subtitle: Text('Ref: ${tx.reference}'),
-                  );
-                },
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    Text(_status, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    if (_isLoading) const LinearProgressIndicator(),
+                  ],
+                ),
               ),
             ),
-            const Divider(),
-            const Text('Local Credit Profiles:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            ..._profiles.map((p) => ListTile(
-              title: Text('Risk Score: ${p.riskScore}'),
-              subtitle: Text('Inflow: Ksh ${p.avgMonthlyInflow}'),
-              trailing: const Icon(Icons.verified_user, color: Colors.green),
-            )),
+            const SizedBox(height: 20),
+            const Text('Local Transaction History', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Expanded(
+              child: _transactions.isEmpty
+                  ? const Center(child: Text('No transactions found. Tap refresh to fetch live data.'))
+                  : ListView.builder(
+                      itemCount: _transactions.length,
+                      itemBuilder: (context, index) {
+                        final tx = _transactions[index];
+                        return ListTile(
+                          leading: Icon(
+                            tx.type == 'CREDIT' ? Icons.arrow_downward : Icons.arrow_upward,
+                            color: tx.type == 'CREDIT' ? Colors.green : Colors.red,
+                          ),
+                          title: Text('${tx.type}: Ksh ${tx.amount}'),
+                          subtitle: Text('${tx.reference} • ${tx.timestamp.toLocal().toString().split('.')[0]}'),
+                        );
+                      },
+                    ),
+            ),
           ],
         ),
       ),
