@@ -1,5 +1,4 @@
 import 'dart:math';
-import '../models/credit_profile.dart';
 import 'database_service.dart';
 
 class VectorSearchService {

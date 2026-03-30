@@ -21,6 +21,15 @@ class KipepeoApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
         useMaterial3: true,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.teal,
+          foregroundColor: Colors.white, // White icons and text
+          elevation: 4, // Add a subtle shadow
+        ),
+        cardTheme: CardThemeData(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          elevation: 2,
+        )
       ),
       home: const Dashboard(),
     );
@@ -57,7 +66,8 @@ class _DashboardState extends State<Dashboard> {
     setState(() {
       _transactions = txs;
       if (txs.isNotEmpty) {
-        _currentProfile = _featureService.generateProfile('USER_PHONE', txs);
+        // Assuming a single user for now, using a placeholder phone number.
+        _currentProfile = _featureService.generateProfile('+2547XXXXXXXX', txs);
         _governanceResult = _governanceService.evaluate(_currentProfile!);
       }
     });
@@ -98,81 +108,126 @@ class _DashboardState extends State<Dashboard> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _isLoading ? null : _fetchLiveData,
+            tooltip: 'Refresh Data',
           )
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_governanceResult != null) ...[
-              _buildRiskCard(),
-              const SizedBox(height: 16),
-            ],
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    Text(_status, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    if (_isLoading) const LinearProgressIndicator(),
-                  ],
+      body: RefreshIndicator(
+        onRefresh: _fetchLiveData,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_governanceResult != null) ...[
+                _buildRiskCard(context),
+                const SizedBox(height: 16),
+              ],
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Status: $_status',
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      if (_isLoading) const Padding(
+                        padding: EdgeInsets.only(top: 8.0),
+                        child: LinearProgressIndicator(),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-            const Text('Local Transaction History', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            Expanded(
-              child: _transactions.isEmpty
-                  ? const Center(child: Text('No transactions found. Tap refresh to fetch live data.'))
-                  : ListView.builder(
-                      itemCount: _transactions.length,
-                      itemBuilder: (context, index) {
-                        final tx = _transactions[index];
-                        return ListTile(
-                          leading: Icon(
-                            tx.type == 'CREDIT' ? Icons.arrow_downward : Icons.arrow_upward,
-                            color: tx.type == 'CREDIT' ? Colors.green : Colors.red,
-                          ),
-                          title: Text('${tx.type}: Ksh ${tx.amount}'),
-                          subtitle: Text('${tx.reference} • ${tx.timestamp.toLocal().toString().split('.')[0]}'),
-                        );
-                      },
-                    ),
-            ),
-          ],
+              const SizedBox(height: 20),
+              Text(
+                'Local Transaction History',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: _transactions.isEmpty
+                    ? const Center(child: Text('No transactions found. Tap refresh or pull down to fetch live data.'))
+                    : ListView.separated(
+                        itemCount: _transactions.length,
+                        separatorBuilder: (context, index) => const Divider(height: 1, indent: 16, endIndent: 16),
+                        itemBuilder: (context, index) {
+                          final tx = _transactions[index];
+                          return ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: tx.type == 'CREDIT' ? Colors.green.shade50 : Colors.red.shade50,
+                              child: Icon(
+                                tx.type == 'CREDIT' ? Icons.arrow_downward : Icons.arrow_upward,
+                                color: tx.type == 'CREDIT' ? Colors.green.shade700 : Colors.red.shade700,
+                                size: 20,
+                              ),
+                            ),
+                            title: Text(
+                              '${tx.type == 'CREDIT' ? '+' : '-'} Ksh ${tx.amount.toStringAsFixed(2)}',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: tx.type == 'CREDIT' ? Colors.green.shade700 : Colors.red.shade700,
+                              ),
+                            ),
+                            subtitle: Text(
+                              '${tx.reference} • ${tx.timestamp.toLocal().toString().split('.')[0]}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            // trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildRiskCard() {
+  Widget _buildRiskCard(BuildContext context) {
     final score = _governanceResult!.finalScore;
     final color = score > 0.7 ? Colors.green : score > 0.4 ? Colors.orange : Colors.red;
+    final theme = Theme.of(context);
 
     return Card(
       color: color.withOpacity(0.1),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Kipepeo Risk Score', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                Text((score * 100).toStringAsFixed(0), 
-                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: color)),
+                Text(
+                  'Kipepeo Risk Score',
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
+                ),
+                Text(
+                  (score * 100).toStringAsFixed(0),
+                  style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w900, color: color),
+                ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text('Decision: ${_governanceResult!.isApproved ? "APPROVED" : "REJECTED"}', 
-              style: TextStyle(fontWeight: FontWeight.bold, color: color)),
+            const SizedBox(height: 12),
+            Text(
+              'Decision: ${_governanceResult!.isApproved ? "APPROVED" : "REJECTED"}',
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: color),
+            ),
             if (_governanceResult!.warnings.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              const Text('Governance Warnings:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              ..._governanceResult!.warnings.map((w) => Text('• $w', style: const TextStyle(fontSize: 12))),
+              const SizedBox(height: 16),
+              Text(
+                'Governance Warnings:',
+                style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface.withOpacity(0.7)),
+              ),
+              const SizedBox(height: 4),
+              ..._governanceResult!.warnings.map((w) => Text(
+                '• $w',
+                style: theme.textTheme.bodySmall,
+              )),
             ]
           ],
         ),
