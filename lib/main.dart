@@ -344,33 +344,89 @@ class AuditHistoryPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final db = DatabaseService();
-    return Scaffold(
-      appBar: AppBar(title: const Text('Decision Vault')),
-      body: FutureBuilder<List<Map<String, dynamic>>>(
-        future: db.getAuditLogs(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) return const LinearProgressIndicator();
-          final logs = snapshot.data!;
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: logs.length,
-            itemBuilder: (context, i) {
-              final log = logs[i];
-              final isApproved = log['decision'] == 'APPROVED';
-              return Card(
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ListTile(
-                  leading: Icon(isApproved ? Icons.verified : Icons.warning, 
-                               color: isApproved ? Colors.teal : Colors.red),
-                  title: Text('Score: ${(log['score'] * 100).toStringAsFixed(0)}'),
-                  subtitle: Text(log['timestamp'].toString().split('T')[0]),
-                  trailing: const Icon(Icons.chevron_right),
-                ),
-              );
-            },
-          );
-        },
+    final String profileId = '96324880c551793f7739545464197e411c5210c14f09a5601a457494f6f89069'; // Current profile ID hash for +2547XXXXXXXX
+
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Decision Vault'),
+          bottom: const TabBar(
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white70,
+            tabs: [
+              Tab(text: 'AUDIT LOGS'),
+              Tab(text: 'LOAN HISTORY'),
+            ],
+          ),
+        ),
+        body: TabBarView(
+          children: [
+            _buildAuditLogs(db),
+            _buildLoanHistory(db, profileId),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildAuditLogs(DatabaseService db) {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: db.getAuditLogs(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        final logs = snapshot.data!;
+        if (logs.isEmpty) return const Center(child: Text('No audit logs found.'));
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: logs.length,
+          itemBuilder: (context, i) {
+            final log = logs[i];
+            final isApproved = log['decision'] == 'APPROVED';
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
+                leading: Icon(isApproved ? Icons.verified : Icons.warning, 
+                             color: isApproved ? Colors.teal : Colors.red),
+                title: Text('Score: ${(log['score'] * 100).toStringAsFixed(0)}'),
+                subtitle: Text(log['timestamp'].toString().split('T')[0]),
+                trailing: const Icon(Icons.chevron_right, size: 16),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildLoanHistory(DatabaseService db, String profileId) {
+    return FutureBuilder<List<Loan>>(
+      future: db.getLoansForProfile(profileId),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        final loans = snapshot.data!;
+        if (loans.isEmpty) return const Center(child: Text('No loan history found.'));
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: loans.length,
+          itemBuilder: (context, i) {
+            final loan = loans[i];
+            final color = loan.status == LoanStatus.paid ? Colors.teal : Colors.orange;
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: color.withOpacity(0.1),
+                  child: Icon(loan.status == LoanStatus.paid ? Icons.check : Icons.access_time, color: color),
+                ),
+                title: Text('Ksh ${loan.principalAmount.toStringAsFixed(0)}'),
+                subtitle: Text('Status: ${loan.status.name.toUpperCase()}'),
+                trailing: Text(DateFormat('dd MMM').format(loan.issuedDate), style: const TextStyle(fontSize: 12)),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
