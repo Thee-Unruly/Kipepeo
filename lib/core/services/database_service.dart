@@ -2,7 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/transaction.dart';
 import '../models/credit_profile.dart';
-import 'dart:convert'; // For JSON encoding/decoding
+import 'dart:convert';
 
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
@@ -22,7 +22,7 @@ class DatabaseService {
     String path = join(await getDatabasesPath(), 'kipepeo.db');
     return await openDatabase(
       path,
-      version: 2, // Upgraded version for new schema
+      version: 3, // Upgraded for anonymized profiles
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -53,14 +53,81 @@ class DatabaseService {
         embedding TEXT
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE anonymized_profiles(
+        id TEXT PRIMARY KEY,
+        risk_score REAL,
+        last_updated TEXT,
+        avg_monthly_inflow REAL,
+        avg_monthly_outflow REAL,
+        repayment_rate REAL,
+        transaction_count INTEGER,
+        embedding TEXT
+      )
+    ''');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 2) {
-      // Basic migration: Drop and recreate for simplicity in early dev
-      await db.execute('DROP TABLE IF EXISTS profiles');
-      await _onCreate(db, newVersion);
+    if (oldVersion < 3) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS anonymized_profiles(
+          id TEXT PRIMARY KEY,
+          risk_score REAL,
+          last_updated TEXT,
+          avg_monthly_inflow REAL,
+          avg_monthly_outflow REAL,
+          repayment_rate REAL,
+          transaction_count INTEGER,
+          embedding TEXT
+        )
+      ''');
     }
+  }
+
+  // --- Profile Methods ---
+  Future<void> saveProfile(CreditProfile profile, {bool isAnonymized = false}) async {
+    final db = await database;
+    final tableName = isAnonymized ? 'anonymized_profiles' : 'profiles';
+    
+    final Map<String, dynamic> data = profile.toMap();
+    data['embedding'] = json.encode(profile.embedding);
+
+    await db.insert(
+      tableName,
+      data,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<CreditProfile?> getProfile(String id, {bool isAnonymized = false}) async {
+    final db = await database;
+    final tableName = isAnonymized ? 'anonymized_profiles' : 'profiles';
+    
+    final List<Map<String, dynamic>> maps = await db.query(
+      tableName,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    if (maps.isEmpty) return null;
+    
+    final Map<String, dynamic> map = Map<String, dynamic>.from(maps.first);
+    map['embedding'] = List<double>.from(json.decode(map['embedding'] as String));
+
+    return CreditProfile.fromMap(map);
+  }
+
+  Future<List<CreditProfile>> getAllProfiles({bool isAnonymized = false}) async {
+    final db = await database;
+    final tableName = isAnonymized ? 'anonymized_profiles' : 'profiles';
+    
+    final List<Map<String, dynamic>> maps = await db.query(tableName);
+    return maps.map((m) {
+      final Map<String, dynamic> map = Map<String, dynamic>.from(m);
+      map['embedding'] = List<double>.from(json.decode(map['embedding'] as String));
+      return CreditProfile.fromMap(map);
+    }).toList();
   }
 
   // --- Transaction Methods ---
@@ -79,46 +146,5 @@ class DatabaseService {
     return List.generate(maps.length, (i) {
       return MobileTransaction.fromMap(maps[i]);
     });
-  }
-
-  // --- Profile Methods ---
-  Future<void> saveProfile(CreditProfile profile) async {
-    final db = await database;
-    // Convert embedding (List<double>) to a JSON string for storage
-    final Map<String, dynamic> data = profile.toMap();
-    data['embedding'] = json.encode(profile.embedding);
-
-    await db.insert(
-      'profiles',
-      data,
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
-  }
-
-  Future<CreditProfile?> getProfile(String id) async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'profiles',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-
-    if (maps.isEmpty) return null;
-    
-    // Convert embedding JSON string back to List<double>
-    final Map<String, dynamic> map = Map<String, dynamic>.from(maps.first);
-    map['embedding'] = List<double>.from(json.decode(map['embedding'] as String));
-
-    return CreditProfile.fromMap(map);
-  }
-
-  Future<List<CreditProfile>> getAllProfiles() async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query('profiles');
-    return maps.map((m) {
-      final Map<String, dynamic> map = Map<String, dynamic>.from(m);
-      map['embedding'] = List<double>.from(json.decode(map['embedding'] as String));
-      return CreditProfile.fromMap(map);
-    }).toList();
   }
 }

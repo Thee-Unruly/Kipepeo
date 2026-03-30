@@ -3,6 +3,7 @@ import 'core/services/sms_service.dart';
 import 'core/services/database_service.dart';
 import 'core/services/feature_service.dart';
 import 'core/services/governance_service.dart';
+import 'core/services/differential_privacy_service.dart';
 import 'core/models/transaction.dart';
 import 'core/models/credit_profile.dart';
 
@@ -23,8 +24,8 @@ class KipepeoApp extends StatelessWidget {
         useMaterial3: true,
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.teal,
-          foregroundColor: Colors.white, // White icons and text
-          elevation: 4, // Add a subtle shadow
+          foregroundColor: Colors.white,
+          elevation: 4,
         ),
         cardTheme: CardThemeData(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -48,8 +49,9 @@ class _DashboardState extends State<Dashboard> {
   final DatabaseService _dbService = DatabaseService();
   final FeatureService _featureService = FeatureService();
   final GovernanceService _governanceService = GovernanceService();
+  final DifferentialPrivacyService _dpService = DifferentialPrivacyService();
 
-  static const String _userPhoneNumber = '+2547XXXXXXXX'; // Placeholder
+  static const String _userPhoneNumber = '+2547XXXXXXXX';
 
   List<MobileTransaction> _transactions = [];
   CreditProfile? _currentProfile;
@@ -69,20 +71,22 @@ class _DashboardState extends State<Dashboard> {
       _transactions = txs;
       if (txs.isNotEmpty) {
         _currentProfile = _featureService.generateProfile(_userPhoneNumber, txs);
-        _governanceResult = _governanceService.evaluate(_currentProfile!); // Evaluate with new profile
-        _dbService.saveProfile(_currentProfile!); // Save the newly generated profile
-      } else {
-        // If no transactions, try to load the last saved profile
-        // We need to generate the ID for the placeholder phone number to retrieve it.
-        final String profileId = _featureService.generateProfileId(_userPhoneNumber); // Using new method
-        _currentProfile = null; // Clear previous profile
-        _governanceResult = null; // Clear previous governance result
+        _governanceResult = _governanceService.evaluate(_currentProfile!);
         
+        // Save real profile
+        _dbService.saveProfile(_currentProfile!);
+        
+        // Phase 3: Anonymize and save to privacy-safe store
+        final anonProfile = _dpService.anonymize(_currentProfile!);
+        _dbService.saveProfile(anonProfile, isAnonymized: true);
+        
+      } else {
+        final String profileId = _featureService.generateProfileId(_userPhoneNumber);
         _dbService.getProfile(profileId).then((storedProfile) {
           setState(() {
             _currentProfile = storedProfile;
             if (_currentProfile != null) {
-              _governanceResult = _governanceService.evaluate(_currentProfile!); // Evaluate stored profile
+              _governanceResult = _governanceService.evaluate(_currentProfile!);
             }
           });
         });
@@ -93,19 +97,17 @@ class _DashboardState extends State<Dashboard> {
   Future<void> _fetchLiveData() async {
     setState(() {
       _isLoading = true;
-      _status = 'Fetching and parsing SMS...';
+      _status = 'Syncing M-Pesa records...';
     });
 
     try {
       final liveTxs = await _smsService.fetchInboxTransactions();
-      
       for (var tx in liveTxs) {
         await _dbService.insertTransaction(tx);
       }
-
-      await _loadStoredData(); // Reloads data, generates, and saves profile
+      await _loadStoredData();
       setState(() {
-        _status = 'Successfully synced ${liveTxs.length} new transactions.';
+        _status = 'Privacy-preserved profile updated.';
       });
     } catch (e) {
       setState(() {
@@ -125,7 +127,6 @@ class _DashboardState extends State<Dashboard> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _isLoading ? null : _fetchLiveData,
-            tooltip: 'Refresh Data',
           )
         ],
       ),
@@ -140,33 +141,16 @@ class _DashboardState extends State<Dashboard> {
                 _buildRiskCard(context),
                 const SizedBox(height: 16),
               ],
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Status: $_status',
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      if (_isLoading) const Padding(
-                        padding: EdgeInsets.only(top: 8.0),
-                        child: LinearProgressIndicator(),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              _buildPrivacyStatusCard(),
               const SizedBox(height: 20),
               Text(
-                'Local Transaction History',
+                'Financial Activity History',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 10),
               Expanded(
                 child: _transactions.isEmpty
-                    ? const Center(child: Text('No transactions found. Tap refresh or pull down to fetch live data.'))
+                    ? const Center(child: Text('No data found. Pull down to sync.'))
                     : ListView.separated(
                         itemCount: _transactions.length,
                         separatorBuilder: (context, index) => const Divider(height: 1, indent: 16, endIndent: 16),
@@ -192,13 +176,42 @@ class _DashboardState extends State<Dashboard> {
                               '${tx.reference} • ${tx.timestamp.toLocal().toString().split('.')[0]}',
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
-                            // trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
                           );
                         },
                       ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPrivacyStatusCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Row(
+          children: [
+            const Icon(Icons.security, color: Colors.teal),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _status,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const Text(
+                    'Differential Privacy Active (ε=1.0)',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+            if (_isLoading) const CircularProgressIndicator(strokeWidth: 2),
+          ],
         ),
       ),
     );
@@ -243,7 +256,7 @@ class _DashboardState extends State<Dashboard> {
                     const SizedBox(width: 10),
                     Text(
                       'Kipepeo Risk Score',
-                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
+                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -262,13 +275,9 @@ class _DashboardState extends State<Dashboard> {
               const SizedBox(height: 16),
               Text(
                 'Governance Warnings:',
-                style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface.withOpacity(0.7)),
+                style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 4),
-              ..._governanceResult!.warnings.map((w) => Text(
-                '• $w',
-                style: theme.textTheme.bodySmall,
-              )),
+              ..._governanceResult!.warnings.map((w) => Text('• $w', style: theme.textTheme.bodySmall)),
             ]
           ],
         ),
