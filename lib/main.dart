@@ -1,6 +1,20 @@
-// --- TRANSACTION REVIEW SCREEN ---
-import 'core/models/transaction.dart';
 
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'core/services/sms_service.dart';
+import 'core/services/database_service.dart';
+import 'core/services/feature_service.dart';
+import 'core/services/governance_service.dart';
+import 'core/services/differential_privacy_service.dart';
+import 'core/services/prospectus_service.dart';
+import 'core/models/transaction.dart';
+import 'core/models/credit_profile.dart';
+import 'core/models/loan.dart';
+import 'core/models/user.dart';
+import 'package:intl/intl.dart';
+import 'dart:math';
+
+// --- TRANSACTION REVIEW SCREEN ---
 class TransactionReviewPage extends StatefulWidget {
   final List<MobileTransaction> transactions;
   final void Function(List<MobileTransaction>) onConfirm;
