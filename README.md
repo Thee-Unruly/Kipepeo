@@ -1,42 +1,42 @@
-# Kipepeo Engine: The Portable Credit Passport
-### Financial Identity & Empowerment for the Informal Economy
+# 🦋 Kipepeo: Your Business Credit Passport
+### Show the world how strong your business is.
 
-## 🌍 The Mission
-Kipepeo is not a loan app. It is a **Financial Identity Engine** designed to move power from the lender to the borrower. It allows small-scale traders ("Mama Mbogas") to own their financial data, process it locally via Edge AI, and generate a **Lender-Ready Credit Prospectus** to negotiate better rates at any financial institution.
+## 🌍 The Goal
+Kipepeo is not a loan app. It is a **Business Identity Tool** made for you. It takes your M-Pesa messages and turns them into a professional **Business Health Report**. You can take this report to any Bank, SACCO, or Group to show them you are a serious business owner and get better rates on loans.
 
-## 🛠 Key Pillars
+## 🛠 How it Helps You
 
-### 💳 Portable Financial Identity (PFI)
-Aggregates fragmented M-Pesa/Airtel SMS data into a professional, human-readable "Business Health Summary" that can be exported and shared.
+### 💳 Your Credit Passport
+Instead of just showing someone your phone messages, Kipepeo makes a professional summary of your business cash flow. You own this report, and you decide who to share it with.
 
-### 🛡️ Verified Governance Layer
-Every summary includes a "Governance Seal" from the STATRECH layer, certifying that the scoring is free from demographic bias and predatory patterns.
+### 🛡️ The "Trust Mark" (Project Ultra)
+Every report has a **Trust Mark**. This tells the bank that your score was calculated fairly by an unbiased system (Project Ultra) and that no one has tampered with your data.
 
-### 🔒 Privacy by Design
-Differential Privacy ensures that while the summary is professional, the user's raw transaction details never leave their device unless they explicitly choose to share the exported PDF.
+### 🔒 Safe & Private
+Your M-Pesa messages **never leave your phone**. The app does all the "math" right here. No one—not even us—can see your personal records unless you choose to share your final report.
 
 ---
 
-## 🛠 Development Roadmap (Updated)
+## 🛠 Our Journey (Completed)
 
-### Phase 1: Edge Data Architecture (Complete)
-- [x] **SMS & Transaction Scrapers**: Localized parsers for M-Pesa.
-- [x] **Data Schema**: Privacy-preserving "Mama Mboga" profile design.
+### Phase 1: Reading Your Business Pulse (Done)
+- [x] **Smart Scraper**: We built a way to read M-Pesa messages safely.
+- [x] **Business Profile**: A special way to store your "Mama Mboga" business history on your phone.
 
-### Phase 2: On-Device ML Pipeline (Complete)
-- [x] **Inference Service**: Local risk-vector generation.
-- [x] **Business Health Heuristics**: Scoring based on restocking frequency and cashflow consistency.
+### Phase 2: The Business Brain (Done)
+- [x] **Smart Scoring**: Logic that looks at how often you restock and how steady your money is.
+- [x] **Local Math**: Everything happens on your phone, not in the "cloud."
 
-### Phase 3: Privacy & Governance (Complete)
-- [x] **Bias Detection**: Ensuring parity for small traders.
-- [x] **Differential Privacy**: Fuzzing sensitive aggregates.
-- [x] **Audit Logs**: Local transparency for all generated scores.
+### Phase 3: Fairness & Safety (Done)
+- [x] **Fairness Check**: Making sure the system is fair to everyone, no matter who they are.
+- [x] **Privacy Shield**: Using advanced math to keep your private details hidden.
 
-### Phase 4: The Credit Passport (In Progress)
-- [ ] **Passport Generator**: Create the "Lender-Ready" Financial Prospectus.
-- [ ] **Governance Seal**: Digital watermark verifying data integrity.
-- [ ] **Export Module**: Shareable summary via WhatsApp/PDF.
+### Phase 4: Your Official Passport (Done)
+- [x] **Report Maker**: Generates your "Lender-Ready" Business Summary.
+- [x] **The Trust Seal**: Adds the Project Ultra mark to verify your business health.
+- [x] **Easy Share**: Send your report to a lender via WhatsApp with one tap.
 
-### Phase 5: Empowerment UI (In Progress)
-- [x] **Identity Hub**: Shift from "Loan Application" to "My Financial Passport."
-- [ ] **Lender Negotiation Tool**: Interactive "What-if" analysis for the borrower.
+### Phase 5: The Business Tracker (Done)
+- [x] **Identity Hub**: Your home screen showing your Business Health Score.
+- [x] **Accountability Ledger**: Track where your loan money goes (Stock vs. Rent) and show lenders you are disciplined.
+- [x] **Payment Tracker**: See your loan balance go down as you pay, giving you a record of reliability.

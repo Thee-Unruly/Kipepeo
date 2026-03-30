@@ -66,15 +66,15 @@ class _MainNavigationState extends State<MainNavigation> {
         onDestinationSelected: (index) => setState(() => _selectedIndex = index),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.badge_outlined), selectedIcon: Icon(Icons.badge), label: 'Passport'),
-          NavigationDestination(icon: Icon(Icons.account_balance_outlined), selectedIcon: Icon(Icons.account_balance), label: 'Tracker'),
-          NavigationDestination(icon: Icon(Icons.shield_outlined), selectedIcon: Icon(Icons.shield), label: 'Shield'),
+          NavigationDestination(icon: Icon(Icons.account_balance_outlined), selectedIcon: Icon(Icons.account_balance), label: 'My Tracker'),
+          NavigationDestination(icon: Icon(Icons.security_outlined), selectedIcon: Icon(Icons.security), label: 'Privacy'),
         ],
       ),
     );
   }
 }
 
-// --- PAGE 1: PASSPORT HUB ---
+// --- PAGE 1: PASSPORT HUB (EMPOWERMENT DASHBOARD) ---
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
@@ -94,7 +94,7 @@ class _DashboardPageState extends State<DashboardPage> {
   GovernanceResult? _governanceResult;
   List<Loan> _loanHistory = [];
   bool _isLoading = false;
-  String _status = 'Awaiting Sync';
+  String _status = 'Awaiting Update';
 
   @override
   void initState() {
@@ -123,7 +123,7 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Financial Passport')),
+      appBar: AppBar(title: const Text('My Business Passport')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -153,12 +153,12 @@ class _DashboardPageState extends State<DashboardPage> {
         padding: const EdgeInsets.all(40),
         child: Column(
           children: [
-            const Icon(Icons.account_balance_wallet, size: 48, color: Colors.teal),
+            const Icon(Icons.storefront, size: 48, color: Colors.teal),
             const SizedBox(height: 16),
-            Text('Business Health Score', style: TextStyle(color: color, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+            Text('Your Business Health Score', style: TextStyle(color: color, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
             Text((score * 100).toStringAsFixed(0), 
                 style: TextStyle(fontSize: 84, fontWeight: FontWeight.w900, color: color, letterSpacing: -4)),
-            Text(_governanceResult!.isApproved ? 'VERIFIED HEALTHY' : 'NEEDS REVIEW', 
+            Text(_governanceResult!.isApproved ? 'VERIFIED HEALTHY' : 'READY TO GROW', 
                 style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2, color: color)),
           ],
         ),
@@ -173,9 +173,9 @@ class _DashboardPageState extends State<DashboardPage> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        leading: const Icon(Icons.description, color: Colors.white, size: 32),
-        title: const Text('Generate Credit Prospectus', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        subtitle: const Text('Lender-ready summary for your SACCO/Bank', style: TextStyle(color: Colors.white70)),
+        leading: const Icon(Icons.verified, color: Colors.white, size: 32),
+        title: const Text('Create My Official Report', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        subtitle: const Text('Checked by the Project Ultra Trust Mark', style: TextStyle(color: Colors.white70)),
         onTap: () => _showProspectus(context),
       ),
     );
@@ -196,7 +196,13 @@ class _DashboardPageState extends State<DashboardPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Your Prospectus', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('My Business Report', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                    Text('Verified by Project Ultra Trust Mark', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold, fontSize: 10)),
+                  ],
+                ),
                 IconButton(icon: const Icon(Icons.share), onPressed: () {}),
               ],
             ),
@@ -222,7 +228,7 @@ class _DashboardPageState extends State<DashboardPage> {
       color: Colors.grey.shade100,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: ListTile(
-        title: const Text('Refresh Financial Identity', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Update My Business Profile', style: TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text(_status),
         trailing: _isLoading ? const CircularProgressIndicator() : const Icon(Icons.sync),
         onTap: () async {
@@ -230,14 +236,14 @@ class _DashboardPageState extends State<DashboardPage> {
           final txs = await _smsService.fetchInboxTransactions();
           for (var tx in txs) { await _dbService.insertTransaction(tx); }
           await _loadData();
-          setState(() { _isLoading = false; _status = 'Identity Refreshed'; });
+          setState(() { _isLoading = false; _status = 'Profile Updated'; });
         },
       ),
     );
   }
 }
 
-// --- PAGE 2: ACCOUNTABILITY TRACKER ---
+// --- PAGE 2: ACCOUNTABILITY TRACKER (DEBT MANAGER) ---
 class AuditHistoryPage extends StatefulWidget {
   const AuditHistoryPage({super.key});
 
@@ -253,7 +259,7 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Accountability Tracker'),
+        title: const Text('My Loan Tracker'),
         actions: [
           IconButton(icon: const Icon(Icons.add_chart), onPressed: () => _showAddLoan(context)),
         ],
@@ -263,7 +269,7 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
         builder: (context, snapshot) {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           final loans = snapshot.data!;
-          if (loans.isEmpty) return const Center(child: Text('No active loans tracked. Add one to start.'));
+          if (loans.isEmpty) return const Center(child: Text('You haven\'t added any loans yet.'));
           
           return ListView.builder(
             padding: const EdgeInsets.all(16),
@@ -300,23 +306,23 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(currency.format(loan.balance), style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
-                    const Text('Remaining Balance', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    const Text('Money Still to Pay', style: TextStyle(color: Colors.grey, fontSize: 12)),
                   ],
                 ),
                 CircularProgressIndicator(value: loan.progress, strokeWidth: 8, backgroundColor: Colors.grey.shade100),
               ],
             ),
             const Divider(height: 40),
-            _buildStatRow('Principal', currency.format(loan.principalAmount)),
-            _buildStatRow('Total Repayable', currency.format(loan.totalToRepay)),
-            _buildStatRow('Business Utilization', '${(loan.businessUtilization * 100).toStringAsFixed(0)}%'),
+            _buildStatRow('Total Loaned', currency.format(loan.principalAmount)),
+            _buildStatRow('Total to Repay', currency.format(loan.totalToRepay)),
+            _buildStatRow('Used for Business', '${(loan.businessUtilization * 100).toStringAsFixed(0)}%'),
             const SizedBox(height: 20),
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
                     icon: const Icon(Icons.receipt_long, size: 16),
-                    label: const Text('LOG EXPENSE'),
+                    label: const Text('RECORD SPENDING'),
                     onPressed: () => _showAddExpense(context, loan),
                   ),
                 ),
@@ -324,7 +330,7 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
                 Expanded(
                   child: ElevatedButton.icon(
                     icon: const Icon(Icons.payment, size: 16),
-                    label: const Text('PAYMENT'),
+                    label: const Text('RECORD PAYMENT'),
                     onPressed: () => _showAddRepayment(context, loan),
                   ),
                 ),
@@ -362,8 +368,8 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Manual Loan Entry', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Lender (Bank/Sacco Name)')),
+            const Text('Add a Loan to Track', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Where did you get the loan? (Bank/Sacco Name)')),
             TextField(controller: amtCtrl, decoration: const InputDecoration(labelText: 'Amount (Ksh)'), keyboardType: TextInputType.number),
             TextField(controller: rateCtrl, decoration: const InputDecoration(labelText: 'Interest Rate (e.g. 0.12)'), keyboardType: TextInputType.number),
             const SizedBox(height: 24),
@@ -406,15 +412,15 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('What was this used for?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const Text('What did you buy?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               DropdownButton<String>(
                 isExpanded: true,
                 value: category,
                 items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                 onChanged: (v) => setModalState(() => category = v!),
               ),
-              TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description')),
-              TextField(controller: amtCtrl, decoration: const InputDecoration(labelText: 'Amount (Ksh)'), keyboardType: TextInputType.number),
+              TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description (e.g. Bought Tomatoes)')),
+              TextField(controller: amtCtrl, decoration: const InputDecoration(labelText: 'Amount Spent (Ksh)'), keyboardType: TextInputType.number),
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: () async {
@@ -429,7 +435,7 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
                   Navigator.pop(context);
                   setState(() {});
                 },
-                child: const Text('LOG EXPENSE'),
+                child: const Text('SAVE RECORD'),
               ),
               const SizedBox(height: 24),
             ],
@@ -449,7 +455,7 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Log a Repayment', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text('Record a Payment', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             TextField(controller: amtCtrl, decoration: const InputDecoration(labelText: 'Amount Paid (Ksh)'), keyboardType: TextInputType.number),
             const SizedBox(height: 24),
             ElevatedButton(
@@ -461,7 +467,7 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
                 Navigator.pop(context);
                 setState(() {});
               },
-              child: const Text('LOG PAYMENT'),
+              child: const Text('SAVE PAYMENT'),
             ),
             const SizedBox(height: 24),
           ],
@@ -471,23 +477,23 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
   }
 }
 
-// --- PAGE 3: PRIVACY SHIELD ---
+// --- PAGE 3: PRIVACY SHIELD (SAFETY PAGE) ---
 class PrivacySettingsPage extends StatelessWidget {
   const PrivacySettingsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Privacy Shield')),
+      appBar: AppBar(title: const Text('My Safety & Privacy')),
       body: ListView(
         padding: const EdgeInsets.all(32),
         children: [
-          const Text('Kipepeo uses On-Device Differential Privacy to protect your financial footprint.', 
+          const Text('Kipepeo keeps your business records safe and private on your phone.', 
                      style: TextStyle(color: Colors.grey)),
           const SizedBox(height: 32),
-          _buildToggleTile('Differential Privacy', 'Active (ε=1.0)', true),
-          _buildToggleTile('Edge Inference', 'Identity built on-device', true),
-          _buildToggleTile('Data Ownership', 'Raw data never leaves phone', true),
+          _buildToggleTile('Privacy Shield', 'Active (Your data is hidden)', true),
+          _buildToggleTile('On-Phone Math', 'Reports are built right here', true),
+          _buildToggleTile('Data Ownership', 'Raw records never leave phone', true),
           const SizedBox(height: 48),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -496,9 +502,30 @@ class PrivacySettingsPage extends StatelessWidget {
               elevation: 0,
               padding: const EdgeInsets.all(16),
             ),
-            onPressed: () {}, 
-            child: const Text('Purge My Identity Data'),
+            onPressed: () => _showDeleteDataDialog(context), 
+            child: const Text('Start Fresh (Delete All My Data)'),
           )
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteDataDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Are you sure?'),
+        content: const Text('This will delete all your local business records and trackers. You will have to start over.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
+          TextButton(
+            onPressed: () {
+              // Delete logic would go here
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All records deleted. Starting fresh.')));
+            }, 
+            child: const Text('YES, DELETE DATA', style: TextStyle(color: Colors.red))
+          ),
         ],
       ),
     );

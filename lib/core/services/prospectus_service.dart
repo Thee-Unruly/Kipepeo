@@ -4,14 +4,15 @@ import 'governance_service.dart';
 import 'package:intl/intl.dart';
 
 class ProspectusService {
-  /// Generates a professional "Financial Prospectus" for the borrower to take to any lender.
+  /// Generates a friendly, clear "Business Passport" for the Mama Mboga.
   String generateProspectus(CreditProfile profile, GovernanceResult gov, List<Loan> loanHistory) {
     final df = DateFormat('dd MMM yyyy');
     final currency = NumberFormat.currency(symbol: 'Ksh ', decimalDigits: 0);
     
-    final String healthStatus = profile.riskScore > 0.7 ? "EXCELLENT" : profile.riskScore > 0.4 ? "STABLE" : "EMERGING";
+    // Friendly Status Language
+    final String healthStatus = profile.riskScore > 0.7 ? "VERY STRONG" : profile.riskScore > 0.4 ? "STEADY" : "GROWING";
     
-    // Efficiency Math
+    // Accountability & Efficiency Math
     double avgUtilization = 0.0;
     int onTimeRepayments = 0;
     if (loanHistory.isNotEmpty) {
@@ -19,35 +20,43 @@ class ProspectusService {
       onTimeRepayments = loanHistory.where((l) => l.status == LoanStatus.paid).length;
     }
 
+    // Dynamic Project Ultra Audit Section in Easy Language
+    String trustSummary = "";
+    if (gov.warnings.isEmpty) {
+      trustSummary = "✅ Verified: No risky debt patterns found.\n✅ Verified: This report is fair and unbiased.";
+    } else {
+      trustSummary = gov.warnings.map((w) => "⚠️ Note: $w").join("\n");
+    }
+
     return '''
-🇰🇪 KIPEPEO FINANCIAL PASSPORT 🇰🇪
+🇰🇪 MY KIPEPEO BUSINESS PASSPORT 🇰🇪
 -----------------------------------
-"Empowering the Informal Economy"
+"Show how strong your business is."
 
 OWNER ID: ${profile.id.substring(0, 12)}
-GENERATED: ${df.format(DateTime.now())}
+REPORT DATE: ${df.format(DateTime.now())}
 
-[ BUSINESS HEALTH SCORE: ${(profile.riskScore * 100).toStringAsFixed(0)}/100 ]
+[ YOUR BUSINESS HEALTH: ${(profile.riskScore * 100).toStringAsFixed(0)}/100 ]
 Status: $healthStatus
-Total Verified Cash Flow: ${currency.format(profile.avgMonthlyInflow)}
+Your Total Cash Flow: ${currency.format(profile.avgMonthlyInflow)}
 
-[ VERIFIED ACCOUNTABILITY LEDGER ]
-- Utilization Efficiency: ${(avgUtilization * 100).toStringAsFixed(0)}%
-- Repayment Discipline: $onTimeRepayments Verified Paid-Off Loans
-- Business Logic: ${(avgUtilization > 0.8) ? "HIGH" : "STANDARD"} Capital Efficiency
+[ YOUR TRUST RECORD ]
+- Money used for stock: ${(avgUtilization * 100).toStringAsFixed(0)}%
+- Loans fully paid back: $onTimeRepayments
+- Business Discipline: ${(avgUtilization > 0.8) ? "EXCELLENT" : "STANDARD"}
 
-[ GOVERNANCE SEAL ]
-Certified by Project Ultra Governance Layer. 
-✅ Verified Non-Predatory History
-✅ Verified Data Ownership
-
-MESSAGE TO LENDER:
-This borrower maintains a verifiable ledger of loan usage. 
-They utilize ${ (avgUtilization * 100).toStringAsFixed(0) }% of borrowed funds for direct business inventory. 
-This individual represents a high-integrity, de-risked professional client.
+[ PROJECT ULTRA TRUST SEAL ]
+This report has been checked for fairness:
+$trustSummary
 
 -----------------------------------
-Generated locally on-device.
+[ MESSAGE TO THE LENDER ]
+This business owner uses their money wisely. 
+They spend ${ (avgUtilization * 100).toStringAsFixed(0) }% of their loans on direct stock. 
+This person is a reliable, professional trader. 
+You can trust this report—it was calculated right on their phone.
+-----------------------------------
+Kipepeo: Empowering Your Business.
 -----------------------------------
 ''';
   }
