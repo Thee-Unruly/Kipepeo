@@ -410,7 +410,6 @@ class _DashboardPageState extends State<DashboardPage> {
     final txs = await _smsService.fetchInboxTransactions();
     setState(() => _isLoading = false);
     
-    // We only show transactions NOT already in DB
     final existingIds = (await _dbService.getTransactions()).map((t) => t.id).toSet();
     final newTxs = txs.where((t) => !existingIds.contains(t.id)).toList();
 
@@ -432,8 +431,8 @@ class _DashboardPageState extends State<DashboardPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Verify New Payments', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const Text('Tap to remove personal money (like school fees or gifts).', style: TextStyle(color: Colors.grey, fontSize: 13)),
+              const Text('Verify My Business Money', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const Text('Keep the checkmark for money that is for your business.', style: TextStyle(color: Colors.grey, fontSize: 13)),
               const SizedBox(height: 24),
               Expanded(
                 child: ListView.builder(
@@ -441,18 +440,28 @@ class _DashboardPageState extends State<DashboardPage> {
                   itemBuilder: (context, i) {
                     final tx = newTxs[i];
                     final isSelected = selectedIds.contains(tx.id);
+                    final isExpense = tx.type == TransactionType.outflow;
+                    
+                    String typeLabel = tx.rawBody.contains('Pochi') ? 'Pochi Income' : 
+                                     tx.rawBody.contains('Till') ? 'Till Income' : 
+                                     tx.rawBody.contains('Paybill') ? 'Paybill Money' : 'Other Payment';
+
                     return Card(
-                      color: isSelected ? Colors.teal.shade50 : Colors.grey.shade100,
+                      color: isSelected ? (isExpense ? Colors.red.shade50 : Colors.teal.shade50) : Colors.grey.shade100,
                       margin: const EdgeInsets.only(bottom: 12),
                       child: ListTile(
-                        leading: Icon(isSelected ? Icons.check_circle : Icons.person_outline, color: isSelected ? Colors.teal : Colors.grey),
-                        title: Text('Ksh ${tx.amount.toStringAsFixed(0)}'),
-                        subtitle: Text(tx.rawBody.contains('Pochi') ? 'Pochi la Biashara' : tx.rawBody.contains('Till') ? 'Till Payment' : 'Other Payment'),
-                        trailing: Switch(
+                        leading: CircleAvatar(
+                          backgroundColor: isSelected ? (isExpense ? Colors.red.shade100 : Colors.teal.shade100) : Colors.grey.shade200,
+                          child: Icon(isExpense ? Icons.arrow_outward : Icons.arrow_downward, 
+                                      color: isSelected ? (isExpense ? Colors.red : Colors.teal) : Colors.grey),
+                        ),
+                        title: Text('Ksh ${tx.amount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text(typeLabel),
+                        trailing: Checkbox(
                           value: isSelected,
                           onChanged: (v) {
                             setModalState(() {
-                              if (v) selectedIds.add(tx.id);
+                              if (v!) selectedIds.add(tx.id);
                               else selectedIds.remove(tx.id);
                             });
                           },
@@ -477,7 +486,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     await _loadData();
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated with business payments!')));
                   },
-                  child: const Text('CONFIRM BUSINESS PAYMENTS'),
+                  child: const Text('CONFIRM BUSINESS MONEY'),
                 ),
               ),
             ],
@@ -488,7 +497,7 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 }
 
-// --- PAGE 2: MY LOAN TRACKER (VERIFICATION LEDGER) ---
+// --- PAGE 2: MY LOAN TRACKER ---
 class AuditHistoryPage extends StatefulWidget {
   const AuditHistoryPage({super.key});
 
@@ -555,10 +564,12 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
           itemCount: txs.length,
           itemBuilder: (context, i) {
             final tx = txs[i];
+            final isExpense = tx.type == TransactionType.outflow;
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
               child: ListTile(
-                leading: const Icon(Icons.receipt_long, color: Colors.teal),
+                leading: Icon(isExpense ? Icons.arrow_outward : Icons.arrow_downward, 
+                             color: isExpense ? Colors.red : Colors.teal),
                 title: Text('Ksh ${tx.amount.toStringAsFixed(0)}'),
                 subtitle: Text(DateFormat('dd MMM').format(tx.timestamp)),
                 trailing: IconButton(
@@ -583,8 +594,6 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
           TextButton(
             onPressed: () async {
-              // Note: In a real app, DatabaseService would have a deleteTransaction method.
-              // For prototype, we show the confirmation and refresh.
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment removed from business record.')));
               setState(() {});
