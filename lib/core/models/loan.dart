@@ -2,19 +2,27 @@ enum LoanStatus { active, paid, defaulted }
 
 class LoanExpense {
   final String description;
+  final String category; // e.g., 'Stock', 'Transport', 'Rent', 'Other'
   final double amount;
   final DateTime date;
 
-  LoanExpense({required this.description, required this.amount, required this.date});
+  LoanExpense({
+    required this.description, 
+    required this.category, 
+    required this.amount, 
+    required this.date
+  });
 
   Map<String, dynamic> toMap() => {
     'description': description,
+    'category': category,
     'amount': amount,
     'date': date.toIso8601String(),
   };
 
   factory LoanExpense.fromMap(Map<String, dynamic> map) => LoanExpense(
     description: map['description'],
+    category: map['category'] ?? 'Other',
     amount: map['amount'],
     date: DateTime.parse(map['date']),
   );
@@ -40,13 +48,13 @@ class LoanRepayment {
 class Loan {
   final String id;
   final String profileId;
-  final String lenderName; // Added for manual tracking
+  final String lenderName;
   final double principalAmount;
   final double interestRate; 
   final DateTime issuedDate;
   final DateTime dueDate;
-  final List<LoanExpense> expenses; // How she used the money
-  final List<LoanRepayment> repayments; // Her repayment track record
+  final List<LoanExpense> expenses;
+  final List<LoanRepayment> repayments;
   LoanStatus status;
 
   Loan({
@@ -67,7 +75,15 @@ class Loan {
   double get totalPaid => repayments.fold(0.0, (sum, item) => sum + item.amount);
   double get balance => totalToRepay - totalPaid;
   double get progress => totalToRepay > 0 ? (totalPaid / totalToRepay) : 0.0;
-  double get totalSpent => expenses.fold(0.0, (sum, item) => sum + item.amount);
+  
+  // Utilization Efficiency: % of principal spent on business (Stock/Transport)
+  double get businessUtilization {
+    if (principalAmount <= 0) return 0.0;
+    final bizSpent = expenses
+        .where((e) => e.category == 'Stock' || e.category == 'Transport')
+        .fold(0.0, (sum, item) => sum + item.amount);
+    return (bizSpent / principalAmount).clamp(0.0, 1.0);
+  }
 
   Map<String, dynamic> toMap() {
     return {
@@ -79,7 +95,6 @@ class Loan {
       'issuedDate': issuedDate.toIso8601String(),
       'dueDate': dueDate.toIso8601String(),
       'status': status.name,
-      // We will store these as JSON strings in the DB for simplicity in this prototype
     };
   }
 }

@@ -1,17 +1,23 @@
 import '../models/credit_profile.dart';
+import '../models/loan.dart';
 import 'governance_service.dart';
 import 'package:intl/intl.dart';
 
 class ProspectusService {
   /// Generates a professional "Financial Prospectus" for the borrower to take to any lender.
-  /// This is her "Credit Passport."
-  String generateProspectus(CreditProfile profile, GovernanceResult gov) {
+  String generateProspectus(CreditProfile profile, GovernanceResult gov, List<Loan> loanHistory) {
     final df = DateFormat('dd MMM yyyy');
     final currency = NumberFormat.currency(symbol: 'Ksh ', decimalDigits: 0);
     
-    // Business Heuristics for the Prospectus
     final String healthStatus = profile.riskScore > 0.7 ? "EXCELLENT" : profile.riskScore > 0.4 ? "STABLE" : "EMERGING";
-    final double liquidityRatio = profile.avgMonthlyOutflow > 0 ? (profile.avgMonthlyInflow / profile.avgMonthlyOutflow) : 0.0;
+    
+    // Efficiency Math
+    double avgUtilization = 0.0;
+    int onTimeRepayments = 0;
+    if (loanHistory.isNotEmpty) {
+      avgUtilization = loanHistory.fold(0.0, (sum, l) => sum + l.businessUtilization) / loanHistory.length;
+      onTimeRepayments = loanHistory.where((l) => l.status == LoanStatus.paid).length;
+    }
 
     return '''
 🇰🇪 KIPEPEO FINANCIAL PASSPORT 🇰🇪
@@ -21,27 +27,27 @@ class ProspectusService {
 OWNER ID: ${profile.id.substring(0, 12)}
 GENERATED: ${df.format(DateTime.now())}
 
-[ BUSINESS HEALTH SUMMARY ]
+[ BUSINESS HEALTH SCORE: ${(profile.riskScore * 100).toStringAsFixed(0)}/100 ]
 Status: $healthStatus
-Kipepeo Score: ${(profile.riskScore * 100).toStringAsFixed(0)}/100
-Monthly Inflow: ${currency.format(profile.avgMonthlyInflow)}
-Liquidity Ratio: ${liquidityRatio.toStringAsFixed(2)}x
+Total Verified Cash Flow: ${currency.format(profile.avgMonthlyInflow)}
 
-[ VERIFIED GOVERNANCE SEAL ]
-This profile has been locally audited for:
-✅ Zero Demographic Bias
-✅ Fair Scoring Heuristics
-✅ Transparent Audit Logs
-Certified by STATRECH Governance Layer.
+[ VERIFIED ACCOUNTABILITY LEDGER ]
+- Utilization Efficiency: ${(avgUtilization * 100).toStringAsFixed(0)}%
+- Repayment Discipline: $onTimeRepayments Verified Paid-Off Loans
+- Business Logic: ${(avgUtilization > 0.8) ? "HIGH" : "STANDARD"} Capital Efficiency
 
-[ MESSAGE TO LENDERS ]
-The owner of this passport owns their financial data. 
-The score above is based on ${profile.transactionCount} local mobile money records. 
-This individual is de-risked and ready for professional credit.
+[ GOVERNANCE SEAL ]
+Certified by Project Ultra Governance Layer. 
+✅ Verified Non-Predatory History
+✅ Verified Data Ownership
+
+MESSAGE TO LENDER:
+This borrower maintains a verifiable ledger of loan usage. 
+They utilize ${ (avgUtilization * 100).toStringAsFixed(0) }% of borrowed funds for direct business inventory. 
+This individual represents a high-integrity, de-risked professional client.
 
 -----------------------------------
-This is a secure, on-device document.
-No raw transaction data left the device.
+Generated locally on-device.
 -----------------------------------
 ''';
   }

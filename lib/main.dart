@@ -92,6 +92,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   CreditProfile? _currentProfile;
   GovernanceResult? _governanceResult;
+  List<Loan> _loanHistory = [];
   bool _isLoading = false;
   String _status = 'Awaiting Sync';
 
@@ -106,9 +107,12 @@ class _DashboardPageState extends State<DashboardPage> {
     if (txs.isNotEmpty) {
       final profile = _featureService.generateProfile('+2547XXXXXXXX', txs);
       final gov = _governanceService.evaluate(profile);
+      final history = await _dbService.getLoansForProfile(profile.id);
+      
       setState(() {
         _currentProfile = profile;
         _governanceResult = gov;
+        _loanHistory = history;
       });
       _dbService.saveProfile(profile);
       _dbService.insertAuditLog(profile.id, gov.finalScore, gov.isApproved, gov.warnings);
@@ -176,7 +180,7 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _showProspectus(BuildContext context) {
-    final prospectus = _prospectusService.generateProspectus(_currentProfile!, _governanceResult!);
+    final prospectus = _prospectusService.generateProspectus(_currentProfile!, _governanceResult!, _loanHistory);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -302,8 +306,8 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
             ),
             const Divider(height: 40),
             _buildStatRow('Principal', currency.format(loan.principalAmount)),
-            _buildStatRow('Interest (Self-Logged)', currency.format(loan.totalInterest)),
-            _buildStatRow('Due Date', DateFormat('dd MMM yyyy').format(loan.dueDate)),
+            _buildStatRow('Total Repayable', currency.format(loan.totalToRepay)),
+            _buildStatRow('Business Utilization', '${(loan.businessUtilization * 100).toStringAsFixed(0)}%'),
             const SizedBox(height: 20),
             Row(
               children: [
@@ -359,7 +363,7 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
             const Text('Manual Loan Entry', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Lender (Bank/Sacco Name)')),
             TextField(controller: amtCtrl, decoration: const InputDecoration(labelText: 'Amount (Ksh)'), keyboardType: TextInputType.number),
-            TextField(controller: rateCtrl, decoration: const InputDecoration(labelText: 'Interest Rate (e.g. 0.12 for 12%)'), keyboardType: TextInputType.number),
+            TextField(controller: rateCtrl, decoration: const InputDecoration(labelText: 'Interest Rate (e.g. 0.12)'), keyboardType: TextInputType.number),
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () async {
@@ -388,30 +392,46 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
   void _showAddExpense(BuildContext context, Loan loan) {
     final descCtrl = TextEditingController();
     final amtCtrl = TextEditingController();
+    String category = 'Stock';
+    final categories = ['Stock', 'Transport', 'Rent', 'Other'];
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 24, right: 24, top: 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('What was this used for?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description (e.g. Stock Restock)')),
-            TextField(controller: amtCtrl, decoration: const InputDecoration(labelText: 'Amount Spent (Ksh)'), keyboardType: TextInputType.number),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () async {
-                final exp = LoanExpense(description: descCtrl.text, amount: double.parse(amtCtrl.text), date: DateTime.now());
-                loan.expenses.add(exp);
-                await _db.saveLoan(loan);
-                Navigator.pop(context);
-                setState(() {});
-              },
-              child: const Text('LOG EXPENSE'),
-            ),
-            const SizedBox(height: 24),
-          ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 24, right: 24, top: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('What was this used for?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              DropdownButton<String>(
+                isExpanded: true,
+                value: category,
+                items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                onChanged: (v) => setModalState(() => category = v!),
+              ),
+              TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description')),
+              TextField(controller: amtCtrl, decoration: const InputDecoration(labelText: 'Amount (Ksh)'), keyboardType: TextInputType.number),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () async {
+                  final exp = LoanExpense(
+                    description: descCtrl.text, 
+                    category: category, 
+                    amount: double.parse(amtCtrl.text), 
+                    date: DateTime.now()
+                  );
+                  loan.expenses.add(exp);
+                  await _db.saveLoan(loan);
+                  Navigator.pop(context);
+                  setState(() {});
+                },
+                child: const Text('LOG EXPENSE'),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
         ),
       ),
     );
