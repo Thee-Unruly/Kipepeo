@@ -26,6 +26,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/butterfly.png
   # Assets will be added here once the model files are physically present in the directory.
   # assets:
   #   - assets/models/kipepeo_risk_model.tflite
