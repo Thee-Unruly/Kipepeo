@@ -23,7 +23,7 @@ class DatabaseService {
     String path = join(await getDatabasesPath(), 'kipepeo.db');
     return await openDatabase(
       path,
-      version: 6, // Upgraded for accountability features
+      version: 7, // Upgraded for Cash Transaction support
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -39,6 +39,17 @@ class DatabaseService {
         type TEXT,
         reference TEXT,
         rawBody TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE cash_transactions(
+        id TEXT PRIMARY KEY,
+        description TEXT,
+        amount REAL,
+        timestamp TEXT,
+        type TEXT,
+        category TEXT
       )
     ''');
     
@@ -64,10 +75,22 @@ class DatabaseService {
     if (oldVersion < 3) await _createAnonymizedProfilesTable(db);
     if (oldVersion < 4) await _createAuditLogsTable(db);
     if (oldVersion < 6) await _createLoansTable(db);
+    if (oldVersion < 7) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS cash_transactions(
+          id TEXT PRIMARY KEY,
+          description TEXT,
+          amount REAL,
+          timestamp TEXT,
+          type TEXT,
+          category TEXT
+        )
+      ''');
+    }
   }
 
   Future<void> _createAnonymizedProfilesTable(Database db) async {
-    await db.execute('CREATE TABLE IF NOT EXISTS anonymized_profiles(...)'); // Simplified
+    await db.execute('CREATE TABLE IF NOT EXISTS anonymized_profiles(id TEXT PRIMARY KEY)'); // Simplified
   }
 
   Future<void> _createAuditLogsTable(Database db) async {
@@ -84,10 +107,8 @@ class DatabaseService {
   }
 
   Future<void> _createLoansTable(Database db) async {
-    // Drop the old basic loans table if it exists to upgrade it
-    await db.execute('DROP TABLE IF EXISTS loans');
     await db.execute('''
-      CREATE TABLE loans(
+      CREATE TABLE IF NOT EXISTS loans(
         id TEXT PRIMARY KEY,
         profileId TEXT,
         lenderName TEXT,
@@ -102,26 +123,38 @@ class DatabaseService {
     ''');
   }
 
+  // --- Cash Transaction Methods ---
+  Future<void> insertCashTransaction(CashTransaction tx) async {
+    final db = await database;
+    await db.insert('cash_transactions', tx.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<List<CashTransaction>> getCashTransactions() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('cash_transactions', orderBy: 'timestamp DESC');
+    return maps.map((m) => CashTransaction.fromMap(m)).toList();
+  }
+
+  Future<void> deleteCashTransaction(String id) async {
+    final db = await database;
+    await db.delete('cash_transactions', where: 'id = ?', whereArgs: [id]);
+  }
+
   // --- Accountability Loan Methods ---
   Future<void> saveLoan(Loan loan) async {
     final db = await database;
     final Map<String, dynamic> data = loan.toMap();
-    
-    // Convert lists to JSON strings for SQLite storage
     data['expenses'] = json.encode(loan.expenses.map((e) => e.toMap()).toList());
     data['repayments'] = json.encode(loan.repayments.map((r) => r.toMap()).toList());
-
     await db.insert('loans', data, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<List<Loan>> getLoansForProfile(String profileId) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query('loans', where: 'profileId = ?', whereArgs: [profileId]);
-    
     return maps.map((m) {
       final List<dynamic> expJson = json.decode(m['expenses'] ?? '[]');
       final List<dynamic> repJson = json.decode(m['repayments'] ?? '[]');
-      
       return Loan(
         id: m['id'],
         profileId: m['profileId'],
@@ -177,5 +210,10 @@ class DatabaseService {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query('transactions');
     return List.generate(maps.length, (i) => MobileTransaction.fromMap(maps[i]));
+  }
+
+  Future<void> deleteTransaction(String id) async {
+    final db = await database;
+    await db.delete('transactions', where: 'id = ?', whereArgs: [id]);
   }
 }
