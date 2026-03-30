@@ -1918,7 +1918,7 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
                   return Card(
                     elevation: 0,
                     margin: const EdgeInsets.only(bottom: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade100)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.grey.shade100)),
                     child: ListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                       leading: CircleAvatar(
