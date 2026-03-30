@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/transaction.dart';
+import '../models/credit_profile.dart';
 
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
@@ -20,8 +21,9 @@ class DatabaseService {
     String path = join(await getDatabasesPath(), 'kipepeo.db');
     return await openDatabase(
       path,
-      version: 1,
+      version: 2, // Upgraded version for new schema
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -38,18 +40,29 @@ class DatabaseService {
       )
     ''');
     
-    // Placeholder for Vector/Profile storage
     await db.execute('''
       CREATE TABLE profiles(
         id TEXT PRIMARY KEY,
-        name TEXT,
         risk_score REAL,
         last_updated TEXT,
-        metadata TEXT
+        avg_monthly_inflow REAL,
+        avg_monthly_outflow REAL,
+        repayment_rate REAL,
+        transaction_count INTEGER,
+        embedding TEXT
       )
     ''');
   }
 
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Basic migration: Drop and recreate for simplicity in early dev
+      await db.execute('DROP TABLE IF EXISTS profiles');
+      await _onCreate(db, newVersion);
+    }
+  }
+
+  // --- Transaction Methods ---
   Future<void> insertTransaction(MobileTransaction tx) async {
     final db = await database;
     await db.insert(
@@ -65,5 +78,33 @@ class DatabaseService {
     return List.generate(maps.length, (i) {
       return MobileTransaction.fromMap(maps[i]);
     });
+  }
+
+  // --- Profile Methods ---
+  Future<void> saveProfile(CreditProfile profile) async {
+    final db = await database;
+    await db.insert(
+      'profiles',
+      profile.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<CreditProfile?> getProfile(String id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'profiles',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    if (maps.isEmpty) return null;
+    return CreditProfile.fromMap(maps.first);
+  }
+
+  Future<List<CreditProfile>> getAllProfiles() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('profiles');
+    return maps.map((m) => CreditProfile.fromMap(m)).toList();
   }
 }
