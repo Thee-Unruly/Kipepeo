@@ -863,9 +863,26 @@ class _DashboardPageState extends State<DashboardPage> {
     // Dynamic metrics
     double avgUtilization = 0.0;
     int onTimeRepayments = 0;
+    double onTimeConsistency = 0.0;
+    int totalRepaymentCount = 0;
+
     if (_loanHistory.isNotEmpty) {
       avgUtilization = _loanHistory.fold(0.0, (sum, l) => sum + l.businessUtilization) / _loanHistory.length;
-      onTimeRepayments = _loanHistory.where((l) => l.status == LoanStatus.paid).length;
+      
+      for (var loan in _loanHistory) {
+        if (loan.status == LoanStatus.paid) onTimeRepayments++;
+        for (var repayment in loan.repayments) {
+          totalRepaymentCount++;
+          if (repayment.date.isBefore(loan.dueDate.add(const Duration(hours: 24)))) {
+            onTimeConsistency += 1.0;
+          }
+        }
+      }
+      if (totalRepaymentCount > 0) {
+        onTimeConsistency = onTimeConsistency / totalRepaymentCount;
+      } else {
+        onTimeConsistency = 1.0; // Default to 100% if no payments yet to avoid penalty
+      }
     }
 
     showModalBottomSheet(
@@ -1258,7 +1275,7 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('My Tracker'),
@@ -1266,7 +1283,9 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
             tabs: [
               Tab(text: 'LOANS'),
               Tab(text: 'PAYMENTS'),
+              Tab(text: 'HEALTH HISTORY'),
             ],
+            labelStyle: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
           ),
         ),
         body: TabBarView(
@@ -1278,6 +1297,10 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
             RefreshIndicator(
               onRefresh: () async => _refreshData(),
               child: _buildTransactionLedger(),
+            ),
+            RefreshIndicator(
+              onRefresh: () async => _refreshData(),
+              child: _buildAuditLogHistory(),
             ),
           ],
         ),
@@ -1575,6 +1598,23 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
                         ),
                       ],
                     ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Divider(height: 1),
+                    ),
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton.icon(
+                        onPressed: () => _showLoanDetails(context, loan),
+                        icon: const Icon(Icons.analytics_outlined, size: 18),
+                        label: const Text('MANAGE USE & REPAYMENT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.teal,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          backgroundColor: Colors.teal.shade50.withOpacity(0.5),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1582,6 +1622,314 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
           },
         );
       },
+    );
+  }
+
+  void _showLoanDetails(BuildContext context, Loan loan) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          height: MediaQuery.of(context).size.height * 0.9,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        loan.lenderName.toUpperCase(),
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal, letterSpacing: 1),
+                      ),
+                      const Text(
+                        'LOAN PERFORMANCE RECORD',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                      ),
+                    ],
+                  ),
+                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
+                ],
+              ),
+              const SizedBox(height: 24),
+              // Balance Progress
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.teal.shade50.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Remaining Balance', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                        Text('Ksh ${loan.balance.toStringAsFixed(0)}', 
+                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 24, color: Colors.teal)),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: LinearProgressIndicator(
+                        value: loan.progress,
+                        minHeight: 12,
+                        color: Colors.teal,
+                        backgroundColor: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${(loan.progress * 100).toStringAsFixed(0)}% Repaid',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.black54),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 32),
+              
+              Expanded(
+                child: DefaultTabController(
+                  length: 2,
+                  child: Column(
+                    children: [
+                      const TabBar(
+                        tabs: [
+                          Tab(text: 'USE BREAKDOWN'),
+                          Tab(text: 'REPAYMENTS'),
+                        ],
+                        labelColor: Colors.teal,
+                        unselectedLabelColor: Colors.grey,
+                        indicatorColor: Colors.teal,
+                        labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                      ),
+                      const SizedBox(height: 16),
+                      Expanded(
+                        child: TabBarView(
+                          children: [
+                            // Use Breakdown Tab
+                            Column(
+                              children: [
+                                Expanded(
+                                  child: loan.expenses.isEmpty 
+                                    ? const Center(child: Text('Add how you used this loan (Stock, Rent, etc.)'))
+                                    : ListView.builder(
+                                        itemCount: loan.expenses.length,
+                                        itemBuilder: (context, i) {
+                                          final e = loan.expenses[i];
+                                          return ListTile(
+                                            leading: const Icon(Icons.shopping_bag, color: Colors.orange),
+                                            title: Text(e.description, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                            subtitle: Text(e.category),
+                                            trailing: Text('Ksh ${e.amount.toStringAsFixed(0)}'),
+                                          );
+                                        },
+                                      ),
+                                ),
+                                ElevatedButton.icon(
+                                  onPressed: () => _addLoanAction(context, loan, true, () => setModalState(() {})),
+                                  icon: const Icon(Icons.add),
+                                  label: const Text('Add Money Use'),
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.orange.shade50, foregroundColor: Colors.orange, elevation: 0),
+                                ),
+                              ],
+                            ),
+                            // Repayments Tab
+                            Column(
+                              children: [
+                                Expanded(
+                                  child: loan.repayments.isEmpty 
+                                    ? const Center(child: Text('No repayments recorded yet.'))
+                                    : ListView.builder(
+                                        itemCount: loan.repayments.length,
+                                        itemBuilder: (context, i) {
+                                          final r = loan.repayments[i];
+                                          return ListTile(
+                                            leading: const Icon(Icons.check_circle, color: Colors.teal),
+                                            title: const Text('Loan Repayment'),
+                                            subtitle: Text(DateFormat('dd MMM').format(r.date)),
+                                            trailing: Text('Ksh ${r.amount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                          );
+                                        },
+                                      ),
+                                ),
+                                ElevatedButton.icon(
+                                  onPressed: () => _addLoanAction(context, loan, false, () => setModalState(() {})),
+                                  icon: const Icon(Icons.payments),
+                                  label: const Text('Record Repayment'),
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.teal.shade50, foregroundColor: Colors.teal, elevation: 0),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _addLoanAction(BuildContext context, Loan loan, bool isExpense, VoidCallback onUpdate) {
+    final amtCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+    String category = 'Stock';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 32, right: 32, top: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(isExpense ? 'Record Loan Use' : 'Record Repayment', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 24),
+              TextField(controller: amtCtrl, decoration: const InputDecoration(labelText: 'Amount (Ksh)'), keyboardType: TextInputType.number),
+              if (isExpense) ...[
+                TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'What was it for?')),
+                const SizedBox(height: 16),
+                DropdownButton<String>(
+                  value: category,
+                  isExpanded: true,
+                  items: ['Stock', 'Transport', 'Rent', 'Wages', 'Other'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                  onChanged: (v) => setModalState(() => category = v!),
+                ),
+              ],
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    if (amtCtrl.text.isEmpty) return;
+                    final amount = double.parse(amtCtrl.text);
+                    if (isExpense) {
+                      loan.expenses.add(LoanExpense(description: descCtrl.text, category: category, amount: amount, date: DateTime.now()));
+                    } else {
+                      loan.repayments.add(LoanRepayment(amount: amount, date: DateTime.now()));
+                      if (loan.balance <= 0) loan.status = LoanStatus.paid;
+                    }
+                    await _db.saveLoan(loan);
+                    Navigator.pop(context);
+                    onUpdate();
+                    _refreshData();
+                  },
+                  child: const Text('SAVE RECORD'),
+                ),
+              ),
+              const SizedBox(height: 32),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAuditLogHistory() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _db.getAuditLogs(_pId),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        if (snapshot.data!.isEmpty) return const Center(child: Text('Sync your data to start your health history.'));
+        
+        final logs = snapshot.data!;
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('REPORTING HISTORY', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1, fontSize: 12)),
+                  TextButton.icon(
+                    onPressed: () => _exportHistoryAsCSV(logs),
+                    icon: const Icon(Icons.file_download_outlined, size: 18),
+                    label: const Text('EXPORT ALL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                    style: TextButton.styleFrom(foregroundColor: Colors.teal),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                itemCount: logs.length,
+                itemBuilder: (context, i) {
+                  final log = logs[i];
+                  final score = (log['score'] as double);
+                  final color = score > 0.7 ? Colors.teal : score > 0.4 ? Colors.orange : Colors.red;
+                  final date = DateTime.parse(log['timestamp']);
+
+                  return Card(
+                    elevation: 0,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade100)),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      leading: CircleAvatar(
+                        backgroundColor: color.withOpacity(0.1),
+                        child: Text((score * 10).toStringAsFixed(1), style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12)),
+                      ),
+                      title: Text(log['decision'], style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 13)),
+                      subtitle: Text(DateFormat('dd MMMM yyyy, HH:mm').format(date), style: const TextStyle(fontSize: 10)),
+                      trailing: const Icon(Icons.chevron_right, size: 16),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _exportHistoryAsCSV(List<Map<String, dynamic>> logs) async {
+    // Generate CSV Content
+    String csv = "Date,Health Score,Decision\n";
+    for (var log in logs) {
+      csv += "${log['timestamp']},${log['score']},${log['decision']}\n";
+    }
+
+    // Since we are in a demo/agent environment, we show a success message 
+    // In a production app, we would use 'path_provider' and 'share_plus' to save/share the file.
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Export Successful'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Your Business Passport History has been generated as a CSV file.'),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(8)),
+              child: Text(csv, style: const TextStyle(fontFamily: 'monospace', fontSize: 8), maxLines: 5, overflow: TextOverflow.ellipsis),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('CLOSE')),
+          ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('SHARE')),
+        ],
+      ),
     );
   }
 

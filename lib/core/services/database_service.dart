@@ -258,4 +258,9 @@ class DatabaseService {
       'warnings': json.encode(w),
     });
   }
+
+  Future<List<Map<String, dynamic>>> getAuditLogs(String profileId) async {
+    final db = await database;
+    return await db.query('audit_logs', where: 'profile_id = ?', whereArgs: [profileId], orderBy: 'timestamp DESC');
+  }
 }
