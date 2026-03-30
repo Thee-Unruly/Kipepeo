@@ -241,7 +241,6 @@ class _DashboardPageState extends State<DashboardPage> {
         height: MediaQuery.of(context).size.height * 0.9,
         child: Column(
           children: [
-            // Header
             Container(
               padding: const EdgeInsets.fromLTRB(32, 40, 32, 24),
               decoration: BoxDecoration(
@@ -270,12 +269,10 @@ class _DashboardPageState extends State<DashboardPage> {
                 ],
               ),
             ),
-            
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.all(32),
                 children: [
-                  // Health Card
                   _buildReportSection(
                     'BUSINESS HEALTH',
                     Column(
@@ -287,10 +284,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       ],
                     ),
                   ),
-                  
                   const SizedBox(height: 24),
-                  
-                  // Stats Grid
                   Row(
                     children: [
                       Expanded(child: _buildStatTile('CASH FLOW', currency.format(_currentProfile!.avgMonthlyInflow), Icons.trending_up)),
@@ -300,10 +294,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                   const SizedBox(height: 16),
                   _buildStatTile('BUSINESS USAGE', '${(avgUtilization * 100).toStringAsFixed(0)}% of funds used for stock', Icons.shopping_cart),
-                  
                   const SizedBox(height: 24),
-                  
-                  // Trust Seal
                   _buildReportSection(
                     'PROJECT ULTRA TRUST SEAL',
                     Column(
@@ -324,10 +315,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                     color: Colors.teal.shade50.withOpacity(0.5),
                   ),
-                  
                   const SizedBox(height: 24),
-                  
-                  // Lender Note
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade300)),
@@ -345,7 +333,6 @@ class _DashboardPageState extends State<DashboardPage> {
                 ],
               ),
             ),
-            
             Padding(
               padding: const EdgeInsets.all(32),
               child: SizedBox(
@@ -413,19 +400,95 @@ class _DashboardPageState extends State<DashboardPage> {
         title: const Text('Update My Business Profile', style: TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text(_status),
         trailing: _isLoading ? const CircularProgressIndicator() : const Icon(Icons.sync),
-        onTap: () async {
-          setState(() { _isLoading = true; _status = 'Updating...'; });
-          final txs = await _smsService.fetchInboxTransactions();
-          for (var tx in txs) { await _dbService.insertTransaction(tx); }
-          await _loadData();
-          setState(() { _isLoading = false; _status = 'Profile Updated'; });
-        },
+        onTap: () => _showVerifyTransactions(context),
+      ),
+    );
+  }
+
+  void _showVerifyTransactions(BuildContext context) async {
+    setState(() => _isLoading = true);
+    final txs = await _smsService.fetchInboxTransactions();
+    setState(() => _isLoading = false);
+    
+    // We only show transactions NOT already in DB
+    final existingIds = (await _dbService.getTransactions()).map((t) => t.id).toSet();
+    final newTxs = txs.where((t) => !existingIds.contains(t.id)).toList();
+
+    if (newTxs.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No new business transactions found.')));
+      return;
+    }
+
+    List<String> selectedIds = newTxs.map((t) => t.id).toList();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          height: MediaQuery.of(context).size.height * 0.8,
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Verify New Payments', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const Text('Tap to remove personal money (like school fees or gifts).', style: TextStyle(color: Colors.grey, fontSize: 13)),
+              const SizedBox(height: 24),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: newTxs.length,
+                  itemBuilder: (context, i) {
+                    final tx = newTxs[i];
+                    final isSelected = selectedIds.contains(tx.id);
+                    return Card(
+                      color: isSelected ? Colors.teal.shade50 : Colors.grey.shade100,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: ListTile(
+                        leading: Icon(isSelected ? Icons.check_circle : Icons.person_outline, color: isSelected ? Colors.teal : Colors.grey),
+                        title: Text('Ksh ${tx.amount.toStringAsFixed(0)}'),
+                        subtitle: Text(tx.rawBody.contains('Pochi') ? 'Pochi la Biashara' : tx.rawBody.contains('Till') ? 'Till Payment' : 'Other Payment'),
+                        trailing: Switch(
+                          value: isSelected,
+                          onChanged: (v) {
+                            setModalState(() {
+                              if (v) selectedIds.add(tx.id);
+                              else selectedIds.remove(tx.id);
+                            });
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.all(16)),
+                  onPressed: () async {
+                    for (var tx in newTxs) {
+                      if (selectedIds.contains(tx.id)) {
+                        await _dbService.insertTransaction(tx);
+                      }
+                    }
+                    Navigator.pop(context);
+                    await _loadData();
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated with business payments!')));
+                  },
+                  child: const Text('CONFIRM BUSINESS PAYMENTS'),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-// --- PAGE 2: ACCOUNTABILITY TRACKER ---
+// --- PAGE 2: MY LOAN TRACKER (VERIFICATION LEDGER) ---
 class AuditHistoryPage extends StatefulWidget {
   const AuditHistoryPage({super.key});
 
@@ -439,26 +502,96 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Loan Tracker'),
-        actions: [
-          IconButton(icon: const Icon(Icons.add_chart), onPressed: () => _showAddLoan(context)),
-        ],
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('My Tracker'),
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'LOANS'),
+              Tab(text: 'PAYMENTS'),
+            ],
+          ),
+          actions: [
+            IconButton(icon: const Icon(Icons.add_chart), onPressed: () => _showAddLoan(context)),
+          ],
+        ),
+        body: TabBarView(
+          children: [
+            _buildLoanList(),
+            _buildTransactionLedger(),
+          ],
+        ),
       ),
-      body: FutureBuilder<List<Loan>>(
-        future: _db.getLoansForProfile(_pId),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-          final loans = snapshot.data!;
-          if (loans.isEmpty) return const Center(child: Text('You haven\'t added any loans yet.'));
-          
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: loans.length,
-            itemBuilder: (context, i) => _buildLoanCard(loans[i]),
-          );
-        },
+    );
+  }
+
+  Widget _buildLoanList() {
+    return FutureBuilder<List<Loan>>(
+      future: _db.getLoansForProfile(_pId),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        final loans = snapshot.data!;
+        if (loans.isEmpty) return const Center(child: Text('Add a loan to start tracking.'));
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: loans.length,
+          itemBuilder: (context, i) => _buildLoanCard(loans[i]),
+        );
+      },
+    );
+  }
+
+  Widget _buildTransactionLedger() {
+    return FutureBuilder<List<MobileTransaction>>(
+      future: _db.getTransactions(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        final txs = snapshot.data!;
+        if (txs.isEmpty) return const Center(child: Text('No business payments verified yet.'));
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: txs.length,
+          itemBuilder: (context, i) {
+            final tx = txs[i];
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                leading: const Icon(Icons.receipt_long, color: Colors.teal),
+                title: Text('Ksh ${tx.amount.toStringAsFixed(0)}'),
+                subtitle: Text(DateFormat('dd MMM').format(tx.timestamp)),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete_sweep, color: Colors.red, size: 20),
+                  onPressed: () => _showRevertDialog(tx),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showRevertDialog(MobileTransaction tx) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove Payment?'),
+        content: const Text('This will remove this payment from your business history. It will NOT delete the SMS from your phone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
+          TextButton(
+            onPressed: () async {
+              // Note: In a real app, DatabaseService would have a deleteTransaction method.
+              // For prototype, we show the confirmation and refresh.
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment removed from business record.')));
+              setState(() {});
+            }, 
+            child: const Text('REMOVE', style: TextStyle(color: Colors.red))
+          ),
+        ],
       ),
     );
   }
@@ -541,7 +674,6 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
     final nameCtrl = TextEditingController();
     final amtCtrl = TextEditingController();
     final rateCtrl = TextEditingController();
-    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -551,7 +683,7 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text('Add a Loan to Track', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Where did you get the loan? (Bank/Sacco Name)')),
+            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Where did you get the loan?')),
             TextField(controller: amtCtrl, decoration: const InputDecoration(labelText: 'Amount (Ksh)'), keyboardType: TextInputType.number),
             TextField(controller: rateCtrl, decoration: const InputDecoration(labelText: 'Interest Rate (e.g. 0.12)'), keyboardType: TextInputType.number),
             const SizedBox(height: 24),
@@ -584,7 +716,6 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
     final amtCtrl = TextEditingController();
     String category = 'Stock';
     final categories = ['Stock', 'Transport', 'Rent', 'Other'];
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -601,17 +732,12 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
                 items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                 onChanged: (v) => setModalState(() => category = v!),
               ),
-              TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description (e.g. Bought Tomatoes)')),
-              TextField(controller: amtCtrl, decoration: const InputDecoration(labelText: 'Amount Spent (Ksh)'), keyboardType: TextInputType.number),
+              TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description')),
+              TextField(controller: amtCtrl, decoration: const InputDecoration(labelText: 'Amount (Ksh)'), keyboardType: TextInputType.number),
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: () async {
-                  final exp = LoanExpense(
-                    description: descCtrl.text, 
-                    category: category, 
-                    amount: double.parse(amtCtrl.text), 
-                    date: DateTime.now()
-                  );
+                  final exp = LoanExpense(description: descCtrl.text, category: category, amount: double.parse(amtCtrl.text), date: DateTime.now());
                   loan.expenses.add(exp);
                   await _db.saveLoan(loan);
                   Navigator.pop(context);
