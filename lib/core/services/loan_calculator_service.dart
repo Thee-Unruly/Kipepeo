@@ -26,28 +26,26 @@ class LoanCalculatorService {
       durationDays = 7;
     }
 
-    final totalToRepay = requestedAmount * (1 + interestRate);
     final now = DateTime.now();
 
     return Loan(
-      id: 'LN_${Random().nextInt(999999)}', // Local ID generation
+      id: 'LN_${Random().nextInt(999999)}',
       profileId: profile.id,
+      lenderName: 'KIPEPEO ENGINE', // Default lender name for auto-generated loans
       principalAmount: requestedAmount,
       interestRate: interestRate,
-      totalToRepay: totalToRepay,
-      amountPaid: 0.0,
       issuedDate: now,
       dueDate: now.add(Duration(days: durationDays)),
       status: LoanStatus.active,
+      expenses: [],
+      repayments: [],
     );
   }
 
   /// Estimates the maximum loan amount based on average monthly inflow.
-  /// Rule: Don't lend more than 30% of their net monthly position.
   double estimateMaxLimit(CreditProfile profile) {
     double netPosition = profile.avgMonthlyInflow - profile.avgMonthlyOutflow;
-    if (netPosition <= 0) return 500.0; // Minimum "Trust" loan for Mama Mbogas
-    
+    if (netPosition <= 0) return 500.0;
     return (netPosition * 0.30).clamp(500.0, 50000.0);
   }
 }

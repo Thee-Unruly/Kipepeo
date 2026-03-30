@@ -1,5 +1,4 @@
 import '../models/loan.dart';
-import '../models/transaction.dart';
 import 'database_service.dart';
 import 'sms_service.dart';
 
@@ -19,33 +18,32 @@ class RepaymentTrackerService {
     for (var tx in txs) {
       final body = tx.rawBody.toLowerCase();
       
-      // Heuristic: Check for repayment keywords and potential amount matches
-      // In a real app, "KIPEPEO" would be the Paybill/Till Name in the SMS
+      // Heuristic: Check for repayment keywords to "KIPEPEO"
       if (body.contains('paid to kipepeo') || body.contains('kipepeo payment')) {
         
-        // If the transaction hasn't been applied to this loan yet
-        // For prototype, we check if the transaction date is after the loan issuance
+        // If the transaction is after issuance and not already logged
         if (tx.timestamp.isAfter(activeLoan.issuedDate)) {
           
-          final updatedLoan = Loan(
-            id: activeLoan.id,
-            profileId: activeLoan.profileId,
-            principalAmount: activeLoan.principalAmount,
-            interestRate: activeLoan.interestRate,
-            totalToRepay: activeLoan.totalToRepay,
-            amountPaid: activeLoan.amountPaid + tx.amount,
-            issuedDate: activeLoan.issuedDate,
-            dueDate: activeLoan.dueDate,
-            status: (activeLoan.amountPaid + tx.amount >= activeLoan.totalToRepay) 
-                ? LoanStatus.paid 
-                : LoanStatus.active,
+          // Check if this specific payment is already in the loan repayment list
+          final alreadyLogged = activeLoan.repayments.any((r) => 
+            r.amount == tx.amount && r.date.difference(tx.timestamp).inMinutes.abs() < 1
           );
 
-          await _db.saveLoan(updatedLoan);
-          updateCount++;
-          
-          // If the loan is fully paid, stop processing for this profile
-          if (updatedLoan.status == LoanStatus.paid) break;
+          if (!alreadyLogged) {
+            activeLoan.repayments.add(LoanRepayment(
+              amount: tx.amount, 
+              date: tx.timestamp
+            ));
+
+            if (activeLoan.balance <= 0) {
+              activeLoan.status = LoanStatus.paid;
+            }
+
+            await _db.saveLoan(activeLoan);
+            updateCount++;
+            
+            if (activeLoan.status == LoanStatus.paid) break;
+          }
         }
       }
     }
