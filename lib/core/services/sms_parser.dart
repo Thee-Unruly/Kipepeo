@@ -1,7 +1,14 @@
 import '../models/transaction.dart';
 
+TransactionType transactionTypeFromString(String value) {
+  return TransactionType.values.firstWhere(
+    (e) => e.name.toLowerCase() == value.toLowerCase(),
+    orElse: () => TransactionType.outflow, // Default fallback
+  );
+}
+
 class SmsParser {
-  /// Parses M-Pesa style SMS. 
+  /// Parses M-Pesa style SMS.
   /// Example: "KXX9876543 Confirmed. Ksh2,000.00 paid to MAMA MBOGA. on 12/5/24 at 10:00 AM New M-Pesa balance is Ksh5,400.00."
   static MobileTransaction? parseMpesa(String address, String body) {
     try {
@@ -20,19 +27,20 @@ class SmsParser {
 
       // Determine Type (Debit/Credit)
       // Very simple heuristic: "paid to" vs "received from"
-      String type = 'DEBIT';
+      String typeStr = 'outflow';
       if (body.toLowerCase().contains('received')) {
-        type = 'CREDIT';
+        typeStr = 'inflow';
       }
 
-      // In a real app, we'd parse the date from the SMS string. 
+      // In a real app, we'd parse the date from the SMS string.
       // For this MVP, we might use the SMS timestamp if available from the provider.
-      
+
       return MobileTransaction(
+        id: 'SMS_$reference',
         sender: address,
         amount: amount,
         timestamp: DateTime.now(), // Fallback
-        type: type,
+        type: transactionTypeFromString(typeStr),
         reference: reference,
         rawBody: body,
       );

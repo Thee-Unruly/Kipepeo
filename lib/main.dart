@@ -75,7 +75,6 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 }
 
-// --- PAGE 1: PASSPORT HUB (RE-POLISHED PREVENT VIEW) ---
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
@@ -95,7 +94,6 @@ class _DashboardPageState extends State<DashboardPage> {
   GovernanceResult? _governanceResult;
   List<Loan> _loanHistory = [];
   bool _isLoading = false;
-  String _status = 'Awaiting Update';
 
   @override
   void initState() {
@@ -131,9 +129,8 @@ class _DashboardPageState extends State<DashboardPage> {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            if (_governanceResult != null) _buildPassportCard(),
+            _buildPassportCard(),
             const SizedBox(height: 24),
-            // RESTORED ACHIEVEMENT-STYLE CARDS
             Row(
               children: [
                 Expanded(child: _buildAchievementCard(Icons.sync, 'Update Profile', 'Sync business SMS', () => _showVerifyTransactions(context))),
@@ -142,7 +139,7 @@ class _DashboardPageState extends State<DashboardPage> {
               ],
             ),
             const SizedBox(height: 24),
-            if (_governanceResult != null) _buildProspectusAction(),
+            _buildProspectusAction(),
           ],
         ),
       ),
@@ -153,7 +150,7 @@ class _DashboardPageState extends State<DashboardPage> {
     return Card(
       elevation: 0,
       color: Colors.grey.shade100,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), border: Border.all(color: Colors.grey.shade200)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: BorderSide(color: Colors.grey.shade200)),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(24),
@@ -174,15 +171,18 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildPassportCard() {
-    final score = _governanceResult!.finalScore;
-    final color = score > 0.7 ? Colors.teal : score > 0.4 ? Colors.orange : Colors.red;
+    final bool hasData = _governanceResult != null;
+    final score = hasData ? _governanceResult!.finalScore : 0.0;
+    final color = !hasData ? Colors.grey : score > 0.7 ? Colors.teal : score > 0.4 ? Colors.orange : Colors.red;
     
-    String statusLabel = score > 0.7 ? "VERY STRONG" : score > 0.4 ? "STEADY" : "GROWING";
-    String statusDesc = score > 0.7 
-        ? "Your business is doing great! Banks will trust you."
-        : score > 0.4 
-            ? "Your business is stable. Keep tracking your stock to grow."
-            : "You are beginning your journey. Sync more messages to show your strength.";
+    String statusLabel = !hasData ? "READY TO START" : score > 0.7 ? "VERY STRONG" : score > 0.4 ? "STEADY" : "GROWING";
+    String statusDesc = !hasData 
+        ? "Sync your M-Pesa messages or record cash to see your score."
+        : score > 0.7 
+            ? "Your business is doing great! Banks will trust you."
+            : score > 0.4 
+                ? "Your business is stable. Keep tracking your stock to grow."
+                : "You are beginning your journey. Sync more messages to show your strength.";
     
     return Card(
       elevation: 0,
@@ -192,7 +192,7 @@ class _DashboardPageState extends State<DashboardPage> {
         padding: const EdgeInsets.all(32),
         child: Column(
           children: [
-            const Icon(Icons.storefront, size: 48, color: Colors.teal),
+            Icon(Icons.storefront, size: 48, color: hasData ? Colors.teal : Colors.grey),
             const SizedBox(height: 16),
             Text('Your Business Health', style: TextStyle(color: color.withOpacity(0.8), fontWeight: FontWeight.bold, letterSpacing: 1.2, fontSize: 12)),
             const SizedBox(height: 8),
@@ -201,8 +201,8 @@ class _DashboardPageState extends State<DashboardPage> {
             Stack(
               alignment: Alignment.center,
               children: [
-                SizedBox(height: 160, width: 160, child: CircularProgressIndicator(value: score, strokeWidth: 14, color: color, backgroundColor: color.withOpacity(0.1), strokeCap: StrokeCap.round)),
-                Text((score * 100).toStringAsFixed(0), style: TextStyle(fontSize: 54, fontWeight: FontWeight.w900, color: color, letterSpacing: -2)),
+                SizedBox(height: 160, width: 160, child: CircularProgressIndicator(value: hasData ? score : 0.0, strokeWidth: 14, color: color, backgroundColor: color.withOpacity(0.1), strokeCap: StrokeCap.round)),
+                Text(hasData ? (score * 100).toStringAsFixed(0) : '--', style: TextStyle(fontSize: 54, fontWeight: FontWeight.w900, color: color, letterSpacing: -2)),
               ],
             ),
             const SizedBox(height: 32),
@@ -211,7 +211,7 @@ class _DashboardPageState extends State<DashboardPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(16)),
-              child: Text("Tip: Recording stock purchases in 'My Tracker' builds trust.", textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.bold)),
+              child: Text(hasData ? "Tip: Recording stock purchases builds trust." : "Tip: Tap 'Update Profile' to begin.", textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -220,16 +220,20 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildProspectusAction() {
-    return Card(
-      elevation: 0,
-      color: Colors.teal.shade700,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        leading: const Icon(Icons.verified, color: Colors.white, size: 32),
-        title: const Text('View My Business Report', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        subtitle: const Text('Official report for Banks & SACCOs', style: TextStyle(color: Colors.white70)),
-        onTap: () => _showVisualReport(context),
+    final bool hasData = _governanceResult != null;
+    return Opacity(
+      opacity: hasData ? 1.0 : 0.6,
+      child: Card(
+        elevation: 0,
+        color: hasData ? Colors.teal.shade700 : Colors.grey.shade700,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          leading: const Icon(Icons.verified, color: Colors.white, size: 32),
+          title: const Text('View My Business Report', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          subtitle: Text(hasData ? 'Official report for Banks & SACCOs' : 'Unlock this after syncing data', style: const TextStyle(color: Colors.white70)),
+          onTap: hasData ? () => _showVisualReport(context) : null,
+        ),
       ),
     );
   }
@@ -256,11 +260,11 @@ class _DashboardPageState extends State<DashboardPage> {
             TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'What was it for?')),
             const SizedBox(height: 32),
             SizedBox(width: double.infinity, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.all(16)), onPressed: () async {
+              if (amtCtrl.text.isEmpty) return;
               final tx = CashTransaction(id: 'CASH_${Random().nextInt(999999)}', description: descCtrl.text, amount: double.parse(amtCtrl.text), timestamp: DateTime.now(), type: type, category: type == TransactionType.inflow ? 'Sales' : 'Stock');
               await _dbService.insertCashTransaction(tx);
               Navigator.pop(context);
               await _loadData();
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cash record saved!')));
             }, child: const Text('SAVE CASH RECORD'))),
             const SizedBox(height: 32),
           ]),

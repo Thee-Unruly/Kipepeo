@@ -17,7 +17,7 @@ class FeatureService {
     for (var tx in transactions) {
       final body = tx.rawBody.toLowerCase();
       
-      if (tx.type == 'CREDIT') {
+      if (tx.type == TransactionType.inflow) {
         totalInflow += tx.amount;
       } else {
         totalOutflow += tx.amount;
