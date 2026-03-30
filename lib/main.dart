@@ -74,7 +74,7 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 }
 
-// --- PAGE 1: PASSPORT HUB (EMPOWERMENT DASHBOARD) ---
+// --- PAGE 1: PASSPORT HUB ---
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
@@ -142,6 +142,19 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _buildPassportCard() {
     final score = _governanceResult!.finalScore;
     final color = score > 0.7 ? Colors.teal : score > 0.4 ? Colors.orange : Colors.red;
+    
+    // Friendly status labels
+    String statusLabel = score > 0.7 ? "VERY STRONG" : score > 0.4 ? "STEADY" : "GROWING";
+    String statusDesc = score > 0.7 
+        ? "Your business is doing great! Banks will trust you."
+        : score > 0.4 
+            ? "Your business is stable. Keep tracking your stock to grow."
+            : "You are beginning your journey. Sync more messages to show your strength.";
+    
+    String tip = score > 0.7
+        ? "Tip: You are ready to negotiate for lower interest rates!"
+        : "Tip: Recording every stock purchase in 'My Tracker' builds trust.";
+
     return Card(
       elevation: 0,
       color: color.withOpacity(0.05),
@@ -150,16 +163,41 @@ class _DashboardPageState extends State<DashboardPage> {
         side: BorderSide(color: color.withOpacity(0.2)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(40),
+        padding: const EdgeInsets.all(32),
         child: Column(
           children: [
             const Icon(Icons.storefront, size: 48, color: Colors.teal),
             const SizedBox(height: 16),
-            Text('Your Business Health Score', style: TextStyle(color: color, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-            Text((score * 100).toStringAsFixed(0), 
-                style: TextStyle(fontSize: 84, fontWeight: FontWeight.w900, color: color, letterSpacing: -4)),
-            Text(_governanceResult!.isApproved ? 'VERIFIED HEALTHY' : 'READY TO GROW', 
-                style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2, color: color)),
+            Text('Your Business Health', style: TextStyle(color: color.withOpacity(0.8), fontWeight: FontWeight.bold, letterSpacing: 1.2, fontSize: 12)),
+            const SizedBox(height: 8),
+            Text(statusLabel, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 24, letterSpacing: 1)),
+            const SizedBox(height: 16),
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  height: 140,
+                  width: 140,
+                  child: CircularProgressIndicator(
+                    value: score,
+                    strokeWidth: 12,
+                    color: color,
+                    backgroundColor: color.withOpacity(0.1),
+                    strokeCap: StrokeCap.round,
+                  ),
+                ),
+                Text((score * 100).toStringAsFixed(0), 
+                    style: TextStyle(fontSize: 48, fontWeight: FontWeight.w900, color: color, letterSpacing: -2)),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Text(statusDesc, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w500, color: Colors.black87)),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(16)),
+              child: Text(tip, textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.bold)),
+            ),
           ],
         ),
       ),
@@ -175,7 +213,7 @@ class _DashboardPageState extends State<DashboardPage> {
         contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         leading: const Icon(Icons.verified, color: Colors.white, size: 32),
         title: const Text('Create My Official Report', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        subtitle: const Text('Checked by the Project Ultra Trust Mark', style: TextStyle(color: Colors.white70)),
+        subtitle: const Text('Checked by Governance Trust Mark', style: TextStyle(color: Colors.white70)),
         onTap: () => _showProspectus(context),
       ),
     );
@@ -243,7 +281,7 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 }
 
-// --- PAGE 2: ACCOUNTABILITY TRACKER (DEBT MANAGER) ---
+// --- PAGE 2: ACCOUNTABILITY TRACKER ---
 class AuditHistoryPage extends StatefulWidget {
   const AuditHistoryPage({super.key});
 
@@ -477,7 +515,7 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
   }
 }
 
-// --- PAGE 3: PRIVACY SHIELD (SAFETY PAGE) ---
+// --- PAGE 3: SAFETY & PRIVACY ---
 class PrivacySettingsPage extends StatelessWidget {
   const PrivacySettingsPage({super.key});
 
@@ -520,7 +558,6 @@ class PrivacySettingsPage extends StatelessWidget {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
           TextButton(
             onPressed: () {
-              // Delete logic would go here
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All records deleted. Starting fresh.')));
             }, 
