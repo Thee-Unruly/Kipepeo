@@ -1,48 +1,42 @@
-# Kipepeo Engine
-### High-Frequency Micro-Lending Risk Engine for Offline Markets
+# Kipepeo Engine: The Portable Credit Passport
+### Financial Identity & Empowerment for the Informal Economy
 
-## Description
-Kipepeo is a localized, Edge-deployed Credit Risk Assessment Engine designed for micro-lending institutions operating in regions with intermittent connectivity. Unlike traditional cloud-based scoring, Kipepeo runs locally on low-resource hardware to provide instant credit decisions for small-scale traders and "Mama Mbogas."
+## 🌍 The Mission
+Kipepeo is not a loan app. It is a **Financial Identity Engine** designed to move power from the lender to the borrower. It allows small-scale traders ("Mama Mbogas") to own their financial data, process it locally via Edge AI, and generate a **Lender-Ready Credit Prospectus** to negotiate better rates at any financial institution.
 
-## Key Requirements
+## 🛠 Key Pillars
 
-### 🚀 On-Device Inference
-Uses quantized GGUF/TFLite models to analyze alternative data (transaction SMS, mobile money patterns, and supply chain history) without uploading sensitive raw data to the cloud.
+### 💳 Portable Financial Identity (PFI)
+Aggregates fragmented M-Pesa/Airtel SMS data into a professional, human-readable "Business Health Summary" that can be exported and shared.
 
-### 🛡️ Privacy-First Governance
-Implements a localized version of your AI Quality Governance Layer to ensure bias-free lending decisions and prevent predatory scoring patterns.
+### 🛡️ Verified Governance Layer
+Every summary includes a "Governance Seal" from the STATRECH layer, certifying that the scoring is free from demographic bias and predatory patterns.
 
-### 🔒 Differential Privacy
-Employs noise-injection techniques to ensure that individual financial records remain private even during model retraining cycles.
-
-### 🛡️ Offline-First Logic
-Ensures that the entire loan lifecycle—from scoring to contract generation and repayment tracking—happens entirely on the device.
+### 🔒 Privacy by Design
+Differential Privacy ensures that while the summary is professional, the user's raw transaction details never leave their device unless they explicitly choose to share the exported PDF.
 
 ---
 
-## 🛠 Development Roadmap
+## 🛠 Development Roadmap (Updated)
 
-### Phase 1: Edge Data Architecture
-- [x] **SMS & Transaction Scrapers**: Build localized parsers for M-Pesa/Airtel Money SMS receipts.
-- [x] **Local Vector Store**: Integrate SQLite with Vector extensions for on-device profile storage.
-- [x] **Data Schema**: Design a privacy-preserving schema for "Mama Mboga" profiles.
+### Phase 1: Edge Data Architecture (Complete)
+- [x] **SMS & Transaction Scrapers**: Localized parsers for M-Pesa.
+- [x] **Data Schema**: Privacy-preserving "Mama Mboga" profile design.
 
-### Phase 2: On-Device ML Pipeline
-- [x] **Model Selection**: Expert Rule Engine (localized for Kenya) and TFLite support.
-- [x] **Inference Service**: Implement a background service in Flutter using `FeatureService`.
-- [x] **Feature Engineering**: Create a local pipeline to convert SMS text into numerical risk vectors.
+### Phase 2: On-Device ML Pipeline (Complete)
+- [x] **Inference Service**: Local risk-vector generation.
+- [x] **Business Health Heuristics**: Scoring based on restocking frequency and cashflow consistency.
 
-### Phase 3: Privacy & Governance Layer
-- [x] **Bias Detection**: Implement the "Governance Layer" to check for demographic parity in lending decisions.
-- [x] **Noise Injection**: Add a Differential Privacy module to "fuzz" sensitive financial aggregates before any cloud sync.
-- [x] **Audit Logs**: Local immutable logs for transparency in scoring decisions.
+### Phase 3: Privacy & Governance (Complete)
+- [x] **Bias Detection**: Ensuring parity for small traders.
+- [x] **Differential Privacy**: Fuzzing sensitive aggregates.
+- [x] **Audit Logs**: Local transparency for all generated scores.
 
-### Phase 4: Offline Business Logic (The Loan Lifecycle)
-- [x] **Repayment Tracker**: Monitor SMS for loan repayment confirmation (e.g., "Paid back 500 Ksh").
-- [x] **Loan Calculator**: Local interest rate calculation and repayment scheduling.
-- [x] **Contract Builder**: Generate a local summary/shareable agreement for the borrower.
+### Phase 4: The Credit Passport (In Progress)
+- [ ] **Passport Generator**: Create the "Lender-Ready" Financial Prospectus.
+- [ ] **Governance Seal**: Digital watermark verifying data integrity.
+- [ ] **Export Module**: Shareable summary via WhatsApp/PDF.
 
-### Phase 5: Agent Interface (UI/UX)
-- [x] **Navigation Hub**: 3-page layout (Hub, Vault, Shield) for professional agent use.
-- [x] **Instant Decision Dashboard**: 5-second visualization of creditworthiness.
-- [x] **Loan Application Flow**: Interactive UI to apply for and track a loan locally.
+### Phase 5: Empowerment UI (In Progress)
+- [x] **Identity Hub**: Shift from "Loan Application" to "My Financial Passport."
+- [ ] **Lender Negotiation Tool**: Interactive "What-if" analysis for the borrower.

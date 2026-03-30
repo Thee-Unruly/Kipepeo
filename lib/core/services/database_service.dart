@@ -23,7 +23,7 @@ class DatabaseService {
     String path = join(await getDatabasesPath(), 'kipepeo.db');
     return await openDatabase(
       path,
-      version: 5, // Upgraded for loans
+      version: 5,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -55,8 +55,26 @@ class DatabaseService {
       )
     ''');
 
+    await _createAnonymizedProfilesTable(db);
+    await _createAuditLogsTable(db);
+    await _createLoansTable(db);
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 3) {
+      await _createAnonymizedProfilesTable(db);
+    }
+    if (oldVersion < 4) {
+      await _createAuditLogsTable(db);
+    }
+    if (oldVersion < 5) {
+      await _createLoansTable(db);
+    }
+  }
+
+  Future<void> _createAnonymizedProfilesTable(Database db) async {
     await db.execute('''
-      CREATE TABLE anonymized_profiles(
+      CREATE TABLE IF NOT EXISTS anonymized_profiles(
         id TEXT PRIMARY KEY,
         risk_score REAL,
         last_updated TEXT,
@@ -67,9 +85,11 @@ class DatabaseService {
         embedding TEXT
       )
     ''');
+  }
 
+  Future<void> _createAuditLogsTable(Database db) async {
     await db.execute('''
-      CREATE TABLE audit_logs(
+      CREATE TABLE IF NOT EXISTS audit_logs(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         profile_id TEXT,
         timestamp TEXT,
@@ -78,9 +98,11 @@ class DatabaseService {
         warnings TEXT
       )
     ''');
+  }
 
+  Future<void> _createLoansTable(Database db) async {
     await db.execute('''
-      CREATE TABLE loans(
+      CREATE TABLE IF NOT EXISTS loans(
         id TEXT PRIMARY KEY,
         profileId TEXT,
         principalAmount REAL,
@@ -92,24 +114,6 @@ class DatabaseService {
         status TEXT
       )
     ''');
-  }
-
-  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 5) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS loans(
-          id TEXT PRIMARY KEY,
-          profileId TEXT,
-          principalAmount REAL,
-          interestRate REAL,
-          totalToRepay REAL,
-          amountPaid REAL,
-          issuedDate TEXT,
-          dueDate TEXT,
-          status TEXT
-        )
-      ''');
-    }
   }
 
   // --- Loan Methods ---

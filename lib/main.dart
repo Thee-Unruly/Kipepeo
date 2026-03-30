@@ -5,9 +5,7 @@ import 'core/services/database_service.dart';
 import 'core/services/feature_service.dart';
 import 'core/services/governance_service.dart';
 import 'core/services/differential_privacy_service.dart';
-import 'core/services/loan_calculator_service.dart';
-import 'core/services/contract_builder_service.dart';
-import 'core/services/repayment_tracker_service.dart';
+import 'core/services/prospectus_service.dart';
 import 'core/models/transaction.dart';
 import 'core/models/credit_profile.dart';
 import 'core/models/loan.dart';
@@ -24,7 +22,7 @@ class KipepeoApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Kipepeo Engine',
+      title: 'Kipepeo Passport',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
         useMaterial3: true,
@@ -66,7 +64,7 @@ class _MainNavigationState extends State<MainNavigation> {
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) => setState(() => _selectedIndex = index),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: 'Hub'),
+          NavigationDestination(icon: Icon(Icons.badge_outlined), selectedIcon: Icon(Icons.badge), label: 'Passport'),
           NavigationDestination(icon: Icon(Icons.history_outlined), selectedIcon: Icon(Icons.history), label: 'Vault'),
           NavigationDestination(icon: Icon(Icons.shield_outlined), selectedIcon: Icon(Icons.shield), label: 'Shield'),
         ],
@@ -75,7 +73,7 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 }
 
-// --- PAGE 1: HUB (DASHBOARD) ---
+// --- PAGE 1: PASSPORT (DASHBOARD) ---
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
@@ -89,13 +87,10 @@ class _DashboardPageState extends State<DashboardPage> {
   final FeatureService _featureService = FeatureService();
   final GovernanceService _governanceService = GovernanceService();
   final DifferentialPrivacyService _dpService = DifferentialPrivacyService();
-  final LoanCalculatorService _loanCalc = LoanCalculatorService();
-  final ContractBuilderService _contractBuilder = ContractBuilderService();
-  final RepaymentTrackerService _repaymentTracker = RepaymentTrackerService();
+  final ProspectusService _prospectusService = ProspectusService();
 
   CreditProfile? _currentProfile;
   GovernanceResult? _governanceResult;
-  Loan? _activeLoan;
   bool _isLoading = false;
   String _status = 'Awaiting Sync';
 
@@ -111,20 +106,9 @@ class _DashboardPageState extends State<DashboardPage> {
       final profile = _featureService.generateProfile('+2547XXXXXXXX', txs);
       final gov = _governanceService.evaluate(profile);
       
-      // Also check for active loans
-      final activeLoan = await _dbService.getActiveLoan(profile.id);
-      
-      // Attempt to auto-process repayments if there's an active loan
-      if (activeLoan != null) {
-        await _repaymentTracker.scanAndProcessRepayments(profile.id);
-      }
-      
-      final updatedActiveLoan = await _dbService.getActiveLoan(profile.id);
-
       setState(() {
         _currentProfile = profile;
         _governanceResult = gov;
-        _activeLoan = updatedActiveLoan;
       });
       
       _dbService.saveProfile(profile);
@@ -136,17 +120,15 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Kipepeo Hub')),
+      appBar: AppBar(title: const Text('My Financial Passport')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            if (_governanceResult != null) _buildRiskCard(),
-            const SizedBox(height: 20),
-            if (_activeLoan != null) _buildActiveLoanCard(),
-            if (_activeLoan == null && _governanceResult != null && _governanceResult!.isApproved) 
-              _buildApplyButton(),
-            const SizedBox(height: 20),
+            if (_governanceResult != null) _buildPassportCard(),
+            const SizedBox(height: 24),
+            if (_governanceResult != null) _buildProspectusAction(),
+            const SizedBox(height: 24),
             _buildActionCard(),
           ],
         ),
@@ -154,24 +136,26 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildRiskCard() {
+  Widget _buildPassportCard() {
     final score = _governanceResult!.finalScore;
     final color = score > 0.7 ? Colors.teal : score > 0.4 ? Colors.orange : Colors.red;
     return Card(
       elevation: 0,
       color: color.withOpacity(0.05),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(32),
         side: BorderSide(color: color.withOpacity(0.2)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(40),
         child: Column(
           children: [
-            Text('Kipepeo Score', style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+            const Icon(Icons.account_balance_wallet, size: 48, color: Colors.teal),
+            const SizedBox(height: 16),
+            Text('Business Health Score', style: TextStyle(color: color, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
             Text((score * 100).toStringAsFixed(0), 
                 style: TextStyle(fontSize: 84, fontWeight: FontWeight.w900, color: color, letterSpacing: -4)),
-            Text(_governanceResult!.isApproved ? 'READY TO LEND' : 'HIGH RISK', 
+            Text(_governanceResult!.isApproved ? 'VERIFIED HEALTHY' : 'NEEDS REVIEW', 
                 style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2, color: color)),
           ],
         ),
@@ -179,131 +163,71 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildActiveLoanCard() {
-    final currency = NumberFormat.currency(symbol: 'Ksh ', decimalDigits: 0);
+  Widget _buildProspectusAction() {
     return Card(
       elevation: 0,
       color: Colors.teal.shade700,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(
-              children: [
-                Icon(Icons.monetization_on, color: Colors.white, size: 20),
-                SizedBox(width: 8),
-                Text('ACTIVE LOAN', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(currency.format(_activeLoan!.totalToRepay), 
-                style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
-            const Text('Total Repayable', style: TextStyle(color: Colors.white70, fontSize: 12)),
-            const SizedBox(height: 20),
-            LinearProgressIndicator(
-              value: _activeLoan!.amountPaid / _activeLoan!.totalToRepay,
-              backgroundColor: Colors.white24,
-              color: Colors.white,
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Paid: ${currency.format(_activeLoan!.amountPaid)}', style: const TextStyle(color: Colors.white, fontSize: 12)),
-                Text('Due: ${DateFormat('dd MMM').format(_activeLoan!.dueDate)}', style: const TextStyle(color: Colors.white, fontSize: 12)),
-              ],
-            ),
-          ],
-        ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        leading: const Icon(Icons.description, color: Colors.white, size: 32),
+        title: const Text('Generate Credit Prospectus', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        subtitle: const Text('Lender-ready summary for your SACCO/Bank', style: TextStyle(color: Colors.white70)),
+        onTap: () => _showProspectus(context),
       ),
     );
   }
 
-  Widget _buildApplyButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: () => _showLoanApplication(context),
-        icon: const Icon(Icons.add),
-        label: const Text('NEW LOAN APPLICATION'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.teal,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
-      ),
-    );
-  }
-
-  void _showLoanApplication(BuildContext context) {
-    final maxLimit = _loanCalc.estimateMaxLimit(_currentProfile!);
-    double requested = maxLimit / 2;
+  void _showProspectus(BuildContext context) {
+    final prospectus = _prospectusService.generateProspectus(_currentProfile!, _governanceResult!);
     
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) {
-          final proposal = _loanCalc.calculateProposedLoan(_currentProfile!, requested);
-          final contract = _contractBuilder.generateContractSummary(proposal, _currentProfile!);
-
-          return Container(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.8,
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('New Loan Proposal', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 24),
-                Text('MAX LIMIT: Ksh ${maxLimit.toStringAsFixed(0)}', style: const TextStyle(color: Colors.teal, fontWeight: FontWeight.bold)),
-                Slider(
-                  value: requested,
-                  min: 500,
-                  max: maxLimit,
-                  divisions: (maxLimit / 500).round(),
-                  label: 'Ksh ${requested.round()}',
-                  onChanged: (v) => setModalState(() => requested = v),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(16)),
-                  child: Text(contract, style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('CANCEL'),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
-                        onPressed: () async {
-                          await _dbService.saveLoan(proposal);
-                          if (!mounted) return;
-                          Navigator.pop(context);
-                          _loadData();
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Loan issued successfully!')));
-                        },
-                        child: const Text('ISSUE LOAN'),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
+                const Text('Your Prospectus', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                IconButton(
+                  icon: const Icon(Icons.share),
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: prospectus));
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Prospectus copied to clipboard! Ready to share.')));
+                  },
+                )
               ],
             ),
-          );
-        },
+            const Text('Share this summary with a lender to prove your creditworthiness.', style: TextStyle(color: Colors.grey)),
+            const SizedBox(height: 24),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade300)),
+                child: SingleChildScrollView(
+                  child: Text(prospectus, style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.all(16)),
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.check),
+                label: const Text('DONE'),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
       ),
     );
   }
@@ -315,20 +239,20 @@ class _DashboardPageState extends State<DashboardPage> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        title: const Text('Sync Financial Records', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Refresh Financial Identity', style: TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text(_status),
         trailing: _isLoading 
           ? const CircularProgressIndicator() 
           : CircleAvatar(
               backgroundColor: Colors.teal,
               child: IconButton(
-                icon: const Icon(Icons.refresh, color: Colors.white),
+                icon: const Icon(Icons.sync, color: Colors.white),
                 onPressed: () async {
-                  setState(() { _isLoading = true; _status = 'Scanning SMS...'; });
+                  setState(() { _isLoading = true; _status = 'Updating Identity...'; });
                   final txs = await _smsService.fetchInboxTransactions();
                   for (var tx in txs) { await _dbService.insertTransaction(tx); }
                   await _loadData();
-                  setState(() { _isLoading = false; _status = 'Records Updated'; });
+                  setState(() { _isLoading = false; _status = 'Identity Refreshed'; });
                 },
               ),
             ),
@@ -338,95 +262,45 @@ class _DashboardPageState extends State<DashboardPage> {
 }
 
 // --- PAGE 2: VAULT (HISTORY) ---
-class AuditHistoryPage extends StatelessWidget {
+class AuditHistoryPage extends StatefulWidget {
   const AuditHistoryPage({super.key});
 
   @override
+  State<AuditHistoryPage> createState() => _AuditHistoryPageState();
+}
+
+class _AuditHistoryPageState extends State<AuditHistoryPage> {
+  final DatabaseService _db = DatabaseService();
+
+  @override
   Widget build(BuildContext context) {
-    final db = DatabaseService();
-    final String profileId = '96324880c551793f7739545464197e411c5210c14f09a5601a457494f6f89069'; // Current profile ID hash for +2547XXXXXXXX
-
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Decision Vault'),
-          bottom: const TabBar(
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
-            tabs: [
-              Tab(text: 'AUDIT LOGS'),
-              Tab(text: 'LOAN HISTORY'),
-            ],
-          ),
-        ),
-        body: TabBarView(
-          children: [
-            _buildAuditLogs(db),
-            _buildLoanHistory(db, profileId),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAuditLogs(DatabaseService db) {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: db.getAuditLogs(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final logs = snapshot.data!;
-        if (logs.isEmpty) return const Center(child: Text('No audit logs found.'));
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: logs.length,
-          itemBuilder: (context, i) {
-            final log = logs[i];
-            final isApproved = log['decision'] == 'APPROVED';
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              child: ListTile(
-                leading: Icon(isApproved ? Icons.verified : Icons.warning, 
-                             color: isApproved ? Colors.teal : Colors.red),
-                title: Text('Score: ${(log['score'] * 100).toStringAsFixed(0)}'),
-                subtitle: Text(log['timestamp'].toString().split('T')[0]),
-                trailing: const Icon(Icons.chevron_right, size: 16),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildLoanHistory(DatabaseService db, String profileId) {
-    return FutureBuilder<List<Loan>>(
-      future: db.getLoansForProfile(profileId),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final loans = snapshot.data!;
-        if (loans.isEmpty) return const Center(child: Text('No loan history found.'));
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: loans.length,
-          itemBuilder: (context, i) {
-            final loan = loans[i];
-            final color = loan.status == LoanStatus.paid ? Colors.teal : Colors.orange;
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: color.withOpacity(0.1),
-                  child: Icon(loan.status == LoanStatus.paid ? Icons.check : Icons.access_time, color: color),
+    return Scaffold(
+      appBar: AppBar(title: const Text('Identity Vault')),
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _db.getAuditLogs(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          final logs = snapshot.data!;
+          if (logs.isEmpty) return const Center(child: Text('No identity history found.'));
+          return ListView.builder(
+            padding: const EdgeInsets.all(24),
+            itemCount: logs.length,
+            itemBuilder: (context, i) {
+              final log = logs[i];
+              final isApproved = log['decision'] == 'APPROVED';
+              return Card(
+                margin: const EdgeInsets.only(bottom: 16),
+                child: ListTile(
+                  leading: Icon(isApproved ? Icons.verified : Icons.warning, 
+                               color: isApproved ? Colors.teal : Colors.red),
+                  title: Text('Health Index: ${(log['score'] * 100).toStringAsFixed(0)}'),
+                  subtitle: Text('Verified on ${log['timestamp'].toString().split('T')[0]}'),
                 ),
-                title: Text('Ksh ${loan.principalAmount.toStringAsFixed(0)}'),
-                subtitle: Text('Status: ${loan.status.name.toUpperCase()}'),
-                trailing: Text(DateFormat('dd MMM').format(loan.issuedDate), style: const TextStyle(fontSize: 12)),
-              ),
-            );
-          },
-        );
-      },
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
@@ -440,15 +314,15 @@ class PrivacySettingsPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Privacy Shield')),
       body: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(32),
         children: [
           const Text('Kipepeo uses On-Device Differential Privacy to protect your financial footprint.', 
                      style: TextStyle(color: Colors.grey)),
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
           _buildToggleTile('Differential Privacy', 'Active (ε=1.0)', true),
-          _buildToggleTile('Edge Inference', 'Decision made on-device', true),
-          _buildToggleTile('Anonymized Sync', 'Pending connection', false),
-          const SizedBox(height: 40),
+          _buildToggleTile('Edge Inference', 'Identity built on-device', true),
+          _buildToggleTile('Data Ownership', 'Raw data never leaves phone', true),
+          const SizedBox(height: 48),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red.shade50,
@@ -457,7 +331,7 @@ class PrivacySettingsPage extends StatelessWidget {
               padding: const EdgeInsets.all(16),
             ),
             onPressed: () {}, 
-            child: const Text('Purge All Local Data'),
+            child: const Text('Purge My Identity Data'),
           )
         ],
       ),
