@@ -1004,6 +1004,25 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
   final DatabaseService _db = DatabaseService();
   final String _pId = 'PROFILE_1';
 
+  late Future<List<Loan>> _loansFuture;
+  late Future<List<dynamic>> _transactionsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshData();
+  }
+
+  void _refreshData() {
+    setState(() {
+      _loansFuture = _db.getLoansForProfile(_pId);
+      _transactionsFuture = Future.wait([
+        _db.getTransactions(),
+        _db.getCashTransactions(),
+      ]);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -1019,7 +1038,152 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
           ),
         ),
         body: TabBarView(
-          children: [_buildLoanList(), _buildTransactionLedger()],
+          children: [
+            RefreshIndicator(
+              onRefresh: () async => _refreshData(),
+              child: _buildLoanList(),
+            ),
+            RefreshIndicator(
+              onRefresh: () async => _refreshData(),
+              child: _buildTransactionLedger(),
+            ),
+          ],
+        ),
+        floatingActionButton: Builder(
+          builder: (context) {
+            final tabController = DefaultTabController.of(context);
+            return AnimatedBuilder(
+              animation: tabController,
+              builder: (context, _) {
+                if (tabController.index == 0) {
+                  return FloatingActionButton.extended(
+                    onPressed: () => _showAddLoanModal(context),
+                    label: const Text('Add Loan'),
+                    icon: const Icon(Icons.add_task),
+                    backgroundColor: Colors.teal,
+                    foregroundColor: Colors.white,
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  void _showAddLoanModal(BuildContext context) {
+    final lenderCtrl = TextEditingController();
+    final amountCtrl = TextEditingController();
+    final rateCtrl = TextEditingController(text: '0.1'); // 10% default
+    DateTime dueDate = DateTime.now().add(const Duration(days: 30));
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: 32,
+            right: 32,
+            top: 32,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'New Loan Record',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 24),
+                TextField(
+                  controller: lenderCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Lender / Source',
+                    hintText: 'e.g. M-Shwari, KCB, Sacco',
+                    prefixIcon: Icon(Icons.business_center),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: amountCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Principal Amount',
+                    prefixText: 'Ksh ',
+                    prefixIcon: Icon(Icons.payments),
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: rateCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Interest Rate (decimal)',
+                    hintText: 'e.g. 0.1 for 10%',
+                    prefixIcon: Icon(Icons.percent),
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 24),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.calendar_today, color: Colors.teal),
+                  title: const Text('Due Date'),
+                  subtitle: Text(DateFormat('yyyy-MM-dd').format(dueDate)),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: dueDate,
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                    );
+                    if (picked != null) {
+                      setModalState(() => dueDate = picked);
+                    }
+                  },
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.teal,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.all(18),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    onPressed: () async {
+                      if (lenderCtrl.text.isEmpty || amountCtrl.text.isEmpty) return;
+                      final loan = Loan(
+                        id: 'LN_${Random().nextInt(999999)}',
+                        profileId: _pId,
+                        lenderName: lenderCtrl.text,
+                        principalAmount: double.parse(amountCtrl.text),
+                        interestRate: double.parse(rateCtrl.text),
+                        issuedDate: DateTime.now(),
+                        dueDate: dueDate,
+                        status: LoanStatus.active,
+                      );
+                      await _db.saveLoan(loan);
+                      if (!mounted) return;
+                      Navigator.pop(context);
+                      _refreshData();
+                    },
+                    child: const Text('SAVE LOAN RECORD'),
+                  ),
+                ),
+                const SizedBox(height: 32),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -1027,41 +1191,226 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
 
   Widget _buildLoanList() {
     return FutureBuilder<List<Loan>>(
-      future: _db.getLoansForProfile(_pId),
+      future: _loansFuture,
       builder: (context, snapshot) {
-        if (!snapshot.hasData)
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
-        return const Center(child: Text('Add a loan to start tracking.'));
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return ListView(
+            children: [
+              SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(48),
+                  child: Column(
+                    children: [
+                      const Icon(Icons.receipt_long, size: 64, color: Colors.grey),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'No loans tracked yet.',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const Text(
+                        'Add a loan to start tracking your business creditworthiness.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton.icon(
+                        onPressed: () => _showAddLoanModal(context),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add My First Loan'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal.shade50,
+                          foregroundColor: Colors.teal,
+                          elevation: 0,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+
+        final loans = snapshot.data!;
+        return ListView.builder(
+          padding: const EdgeInsets.all(24),
+          itemCount: loans.length,
+          itemBuilder: (context, i) {
+            final loan = loans[i];
+            return Card(
+              elevation: 0,
+              margin: const EdgeInsets.only(bottom: 24),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+                side: BorderSide(color: Colors.teal.withOpacity(0.1)),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              loan.lenderName.toUpperCase(),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 13,
+                                letterSpacing: 1.2,
+                                color: Colors.teal,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Due: ${DateFormat('dd MMM yyyy').format(loan.dueDate)}',
+                              style: const TextStyle(
+                                color: Colors.grey,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: loan.status == LoanStatus.active
+                                ? Colors.orange.shade50
+                                : Colors.teal.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            loan.status.name.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: loan.status == LoanStatus.active
+                                  ? Colors.orange
+                                  : Colors.teal,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Balance',
+                          style: TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                        Text(
+                          'Ksh ${loan.balance.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: LinearProgressIndicator(
+                        value: loan.progress,
+                        backgroundColor: Colors.teal.withOpacity(0.05),
+                        color: Colors.teal,
+                        minHeight: 8,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Paid: Ksh ${loan.totalPaid.toStringAsFixed(0)}',
+                          style: const TextStyle(color: Colors.grey, fontSize: 11),
+                        ),
+                        Text(
+                          'Total: Ksh ${loan.totalToRepay.toStringAsFixed(0)}',
+                          style: const TextStyle(color: Colors.grey, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
       },
     );
   }
 
   Widget _buildTransactionLedger() {
-    return FutureBuilder(
-      future: Future.wait([_db.getTransactions(), _db.getCashTransactions()]),
+    return FutureBuilder<List<dynamic>>(
+      future: _transactionsFuture,
       builder: (context, snapshot) {
-        if (!snapshot.hasData)
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
+        }
+        if (!snapshot.hasData || (snapshot.data![0].isEmpty && snapshot.data![1].isEmpty)) {
+          return const Center(child: Text('No transactions recorded yet.'));
+        }
+        
         final List<FinancialTransaction> allTxs = [
           ...snapshot.data![0] as List<MobileTransaction>,
           ...snapshot.data![1] as List<CashTransaction>,
         ];
+        
+        allTxs.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
         return ListView.builder(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(24),
           itemCount: allTxs.length,
           itemBuilder: (context, i) {
             final tx = allTxs[i];
+            final isExpense = tx.type == TransactionType.outflow;
+            
             return Card(
-              margin: const EdgeInsets.only(bottom: 8),
+              elevation: 0,
+              margin: const EdgeInsets.only(bottom: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: Colors.grey.shade100),
+              ),
               child: ListTile(
-                leading: Icon(
-                  tx.type == TransactionType.outflow
-                      ? Icons.shopping_bag
-                      : Icons.payments,
-                  color: Colors.teal,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                leading: CircleAvatar(
+                  backgroundColor: isExpense ? Colors.red.shade50 : Colors.teal.shade50,
+                  child: Icon(
+                    isExpense ? Icons.shopping_cart_outlined : Icons.payments_outlined,
+                    color: isExpense ? Colors.red : Colors.teal,
+                    size: 20,
+                  ),
                 ),
-                title: Text('Ksh ${tx.amount.toStringAsFixed(0)}'),
-                subtitle: Text(DateFormat('dd MMM').format(tx.timestamp)),
+                title: Text(
+                  'Ksh ${tx.amount.toStringAsFixed(0)}',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                subtitle: Text(
+                  DateFormat('dd MMMM, HH:mm').format(tx.timestamp),
+                  style: const TextStyle(fontSize: 12),
+                ),
+                trailing: Text(
+                  isExpense ? 'OUT' : 'IN',
+                  style: TextStyle(
+                    color: isExpense ? Colors.red : Colors.teal,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 10,
+                  ),
+                ),
               ),
             );
           },
