@@ -20,3 +20,28 @@ Uses a Vector Database (Milvus Lite) for local similarity searches of credit pro
 
 ---
 
+## 🛠 Development Roadmap
+
+### Phase 1: Edge Data Architecture
+- [ ] **SMS & Transaction Scrapers**: Build localized parsers for M-Pesa/Airtel Money SMS receipts.
+- [ ] **Local Vector Store**: Integrate Milvus Lite (or SQLite with Vector extensions) for on-device profile storage.
+- [ ] **Data Schema**: Design a privacy-preserving schema for "Mama Mboga" profiles.
+
+### Phase 2: On-Device ML Pipeline
+- [ ] **Model Selection**: Quantize specialized Credit Scoring LLMs to GGUF (4-bit) or TFLite formats.
+- [ ] **Inference Service**: Implement a background service in Flutter using `tflite_flutter` or `mediapipe`.
+- [ ] **Feature Engineering**: Create a local pipeline to convert SMS text into numerical risk vectors.
+
+### Phase 3: Privacy & Governance Layer
+- [ ] **Bias Detection**: Implement the "Governance Layer" to check for demographic parity in lending decisions.
+- [ ] **Noise Injection**: Add a Differential Privacy module to "fuzz" sensitive financial aggregates before any cloud sync.
+- [ ] **Audit Logs**: Local immutable logs for transparency in scoring decisions.
+
+### Phase 4: Hybrid Sync & Offline Logic
+- [ ] **Connectivity Manager**: Monitor network states to trigger background sync.
+- [ ] **Delta Sync**: Only upload non-sensitive model gradients or anonymized vector updates.
+- [ ] **Conflict Resolution**: Logic for merging local profile updates with central records.
+
+### Phase 5: Agent Interface (UI/UX)
+- [ ] **Instant Decision Dashboard**: 5-second visualization of creditworthiness.
+- [ ] **Offline-First UI**: Ensure the app remains fully functional without an internet connection.
