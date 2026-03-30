@@ -3,37 +3,10 @@ import 'package:path/path.dart';
 import '../models/transaction.dart';
 import '../models/credit_profile.dart';
 import '../models/loan.dart';
+import '../models/user.dart';
 import 'dart:convert';
 
 class DatabaseService {
-  /// Returns the most recent active loan for a profile, or null if none.
-  Future<Loan?> getActiveLoan(String profileId) async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'loans',
-      where: 'profileId = ? AND status = ?',
-      whereArgs: [profileId, LoanStatus.active.name],
-      orderBy: 'issuedDate DESC',
-      limit: 1,
-    );
-    if (maps.isEmpty) return null;
-    final m = maps.first;
-    final List<dynamic> expJson = json.decode(m['expenses'] ?? '[]');
-    final List<dynamic> repJson = json.decode(m['repayments'] ?? '[]');
-    return Loan(
-      id: m['id'],
-      profileId: m['profileId'],
-      lenderName: m['lenderName'],
-      principalAmount: m['principalAmount'],
-      interestRate: m['interestRate'],
-      issuedDate: DateTime.parse(m['issuedDate']),
-      dueDate: DateTime.parse(m['dueDate']),
-      status: LoanStatus.values.byName(m['status']),
-      expenses: expJson.map((e) => LoanExpense.fromMap(e)).toList(),
-      repayments: repJson.map((r) => LoanRepayment.fromMap(r)).toList(),
-    );
-  }
-
   static final DatabaseService _instance = DatabaseService._internal();
   static Database? _database;
 
@@ -51,13 +24,23 @@ class DatabaseService {
     String path = join(await getDatabasesPath(), 'kipepeo.db');
     return await openDatabase(
       path,
-      version: 7,
+      version: 8, // Upgraded for User support
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
   }
 
   Future<void> _onCreate(Database db, int version) async {
+    await db.execute('''
+      CREATE TABLE users(
+        id TEXT PRIMARY KEY,
+        phoneNumber TEXT UNIQUE,
+        fullName TEXT,
+        businessName TEXT,
+        password TEXT
+      )
+    ''');
+
     await db.execute('''
       CREATE TABLE transactions(
         id TEXT PRIMARY KEY,
@@ -80,7 +63,7 @@ class DatabaseService {
         category TEXT
       )
     ''');
-
+    
     await db.execute('''
       CREATE TABLE profiles(
         id TEXT PRIMARY KEY,
@@ -135,19 +118,43 @@ class DatabaseService {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 7) {
-      await db.execute('DROP TABLE IF EXISTS cash_transactions');
+    if (oldVersion < 8) {
       await db.execute('''
-        CREATE TABLE cash_transactions(
+        CREATE TABLE IF NOT EXISTS users(
           id TEXT PRIMARY KEY,
-          description TEXT,
-          amount REAL,
-          timestamp TEXT,
-          type TEXT,
-          category TEXT
+          phoneNumber TEXT UNIQUE,
+          fullName TEXT,
+          businessName TEXT,
+          password TEXT
         )
       ''');
     }
+  }
+
+  // --- User Methods ---
+  Future<void> registerUser(User user) async {
+    final db = await database;
+    await db.insert('users', user.toMap(), conflictAlgorithm: ConflictAlgorithm.fail);
+  }
+
+  Future<User?> loginUser(String phoneNumber, String password) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'users',
+      where: 'phoneNumber = ? AND password = ?',
+      whereArgs: [phoneNumber, password],
+    );
+    if (maps.isNotEmpty) {
+      return User.fromMap(maps.first);
+    }
+    return null;
+  }
+
+  Future<User?> getUser(String id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('users', where: 'id = ?', whereArgs: [id]);
+    if (maps.isNotEmpty) return User.fromMap(maps.first);
+    return null;
   }
 
   // --- Profile Methods ---
@@ -174,30 +181,19 @@ class DatabaseService {
     final tableName = isAnonymized ? 'anonymized_profiles' : 'profiles';
     final Map<String, dynamic> data = p.toMap();
     data['embedding'] = json.encode(p.embedding);
-    await db.insert(
-      tableName,
-      data,
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert(tableName, data, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   // --- Transaction Methods ---
   Future<void> insertTransaction(MobileTransaction tx) async {
     final db = await database;
-    await db.insert(
-      'transactions',
-      tx.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert('transactions', tx.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<List<MobileTransaction>> getTransactions() async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query('transactions');
-    return List.generate(
-      maps.length,
-      (i) => MobileTransaction.fromMap(maps[i]),
-    );
+    return List.generate(maps.length, (i) => MobileTransaction.fromMap(maps[i]));
   }
 
   Future<void> deleteTransaction(String id) async {
@@ -208,19 +204,12 @@ class DatabaseService {
   // --- Cash Transaction Methods ---
   Future<void> insertCashTransaction(CashTransaction tx) async {
     final db = await database;
-    await db.insert(
-      'cash_transactions',
-      tx.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert('cash_transactions', tx.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<List<CashTransaction>> getCashTransactions() async {
     final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'cash_transactions',
-      orderBy: 'timestamp DESC',
-    );
+    final List<Map<String, dynamic>> maps = await db.query('cash_transactions', orderBy: 'timestamp DESC');
     return maps.map((m) => CashTransaction.fromMap(m)).toList();
   }
 
@@ -233,26 +222,14 @@ class DatabaseService {
   Future<void> saveLoan(Loan loan) async {
     final db = await database;
     final Map<String, dynamic> data = loan.toMap();
-    data['expenses'] = json.encode(
-      loan.expenses.map((e) => e.toMap()).toList(),
-    );
-    data['repayments'] = json.encode(
-      loan.repayments.map((r) => r.toMap()).toList(),
-    );
-    await db.insert(
-      'loans',
-      data,
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    data['expenses'] = json.encode(loan.expenses.map((e) => e.toMap()).toList());
+    data['repayments'] = json.encode(loan.repayments.map((r) => r.toMap()).toList());
+    await db.insert('loans', data, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<List<Loan>> getLoansForProfile(String profileId) async {
     final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'loans',
-      where: 'profileId = ?',
-      whereArgs: [profileId],
-    );
+    final List<Map<String, dynamic>> maps = await db.query('loans', where: 'profileId = ?', whereArgs: [profileId]);
     return maps.map((m) {
       final List<dynamic> expJson = json.decode(m['expenses'] ?? '[]');
       final List<dynamic> repJson = json.decode(m['repayments'] ?? '[]');
@@ -272,12 +249,7 @@ class DatabaseService {
   }
 
   // --- Audit Methods ---
-  Future<void> insertAuditLog(
-    String pId,
-    double s,
-    bool a,
-    List<String> w,
-  ) async {
+  Future<void> insertAuditLog(String pId, double s, bool a, List<String> w) async {
     final db = await database;
     await db.insert('audit_logs', {
       'profile_id': pId,
