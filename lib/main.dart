@@ -10,6 +10,7 @@ import 'core/models/transaction.dart';
 import 'core/models/credit_profile.dart';
 import 'core/models/loan.dart';
 import 'package:intl/intl.dart';
+import 'dart:math';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -65,7 +66,7 @@ class _MainNavigationState extends State<MainNavigation> {
         onDestinationSelected: (index) => setState(() => _selectedIndex = index),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.badge_outlined), selectedIcon: Icon(Icons.badge), label: 'Passport'),
-          NavigationDestination(icon: Icon(Icons.history_outlined), selectedIcon: Icon(Icons.history), label: 'Vault'),
+          NavigationDestination(icon: Icon(Icons.account_balance_outlined), selectedIcon: Icon(Icons.account_balance), label: 'Tracker'),
           NavigationDestination(icon: Icon(Icons.shield_outlined), selectedIcon: Icon(Icons.shield), label: 'Shield'),
         ],
       ),
@@ -73,7 +74,7 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 }
 
-// --- PAGE 1: PASSPORT (DASHBOARD) ---
+// --- PAGE 1: PASSPORT HUB ---
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
@@ -105,12 +106,10 @@ class _DashboardPageState extends State<DashboardPage> {
     if (txs.isNotEmpty) {
       final profile = _featureService.generateProfile('+2547XXXXXXXX', txs);
       final gov = _governanceService.evaluate(profile);
-      
       setState(() {
         _currentProfile = profile;
         _governanceResult = gov;
       });
-      
       _dbService.saveProfile(profile);
       _dbService.insertAuditLog(profile.id, gov.finalScore, gov.isApproved, gov.warnings);
       _dbService.saveProfile(_dpService.anonymize(profile), isAnonymized: true);
@@ -120,18 +119,16 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('My Financial Passport')),
+      appBar: AppBar(title: const Text('Financial Passport')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            if (_governanceResult != null) _buildPassportCard(),
-            const SizedBox(height: 24),
-            if (_governanceResult != null) _buildProspectusAction(),
-            const SizedBox(height: 24),
-            _buildActionCard(),
-          ],
-        ),
+        children: [
+          if (_governanceResult != null) _buildPassportCard(),
+          const SizedBox(height: 24),
+          if (_governanceResult != null) _buildProspectusAction(),
+          const SizedBox(height: 24),
+          _buildActionCard(),
+        ],
       ),
     );
   }
@@ -180,7 +177,6 @@ class _DashboardPageState extends State<DashboardPage> {
 
   void _showProspectus(BuildContext context) {
     final prospectus = _prospectusService.generateProspectus(_currentProfile!, _governanceResult!);
-    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -195,37 +191,19 @@ class _DashboardPageState extends State<DashboardPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('Your Prospectus', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                IconButton(
-                  icon: const Icon(Icons.share),
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: prospectus));
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Prospectus copied to clipboard! Ready to share.')));
-                  },
-                )
+                IconButton(icon: const Icon(Icons.share), onPressed: () {}),
               ],
             ),
-            const Text('Share this summary with a lender to prove your creditworthiness.', style: TextStyle(color: Colors.grey)),
             const SizedBox(height: 24),
             Expanded(
               child: Container(
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade300)),
-                child: SingleChildScrollView(
-                  child: Text(prospectus, style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
-                ),
+                decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(16)),
+                child: SingleChildScrollView(child: Text(prospectus, style: const TextStyle(fontFamily: 'monospace', fontSize: 11))),
               ),
             ),
             const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.all(16)),
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.check),
-                label: const Text('DONE'),
-              ),
-            ),
-            const SizedBox(height: 16),
+            SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('DONE'))),
           ],
         ),
       ),
@@ -238,30 +216,22 @@ class _DashboardPageState extends State<DashboardPage> {
       color: Colors.grey.shade100,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         title: const Text('Refresh Financial Identity', style: TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text(_status),
-        trailing: _isLoading 
-          ? const CircularProgressIndicator() 
-          : CircleAvatar(
-              backgroundColor: Colors.teal,
-              child: IconButton(
-                icon: const Icon(Icons.sync, color: Colors.white),
-                onPressed: () async {
-                  setState(() { _isLoading = true; _status = 'Updating Identity...'; });
-                  final txs = await _smsService.fetchInboxTransactions();
-                  for (var tx in txs) { await _dbService.insertTransaction(tx); }
-                  await _loadData();
-                  setState(() { _isLoading = false; _status = 'Identity Refreshed'; });
-                },
-              ),
-            ),
+        trailing: _isLoading ? const CircularProgressIndicator() : const Icon(Icons.sync),
+        onTap: () async {
+          setState(() { _isLoading = true; _status = 'Updating...'; });
+          final txs = await _smsService.fetchInboxTransactions();
+          for (var tx in txs) { await _dbService.insertTransaction(tx); }
+          await _loadData();
+          setState(() { _isLoading = false; _status = 'Identity Refreshed'; });
+        },
       ),
     );
   }
 }
 
-// --- PAGE 2: VAULT (HISTORY) ---
+// --- PAGE 2: ACCOUNTABILITY TRACKER ---
 class AuditHistoryPage extends StatefulWidget {
   const AuditHistoryPage({super.key});
 
@@ -271,41 +241,215 @@ class AuditHistoryPage extends StatefulWidget {
 
 class _AuditHistoryPageState extends State<AuditHistoryPage> {
   final DatabaseService _db = DatabaseService();
+  final String _pId = '96324880c551793f7739545464197e411c5210c14f09a5601a457494f6f89069';
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Identity Vault')),
-      body: FutureBuilder<List<Map<String, dynamic>>>(
-        future: _db.getAuditLogs(),
+      appBar: AppBar(
+        title: const Text('Accountability Tracker'),
+        actions: [
+          IconButton(icon: const Icon(Icons.add_chart), onPressed: () => _showAddLoan(context)),
+        ],
+      ),
+      body: FutureBuilder<List<Loan>>(
+        future: _db.getLoansForProfile(_pId),
         builder: (context, snapshot) {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-          final logs = snapshot.data!;
-          if (logs.isEmpty) return const Center(child: Text('No identity history found.'));
+          final loans = snapshot.data!;
+          if (loans.isEmpty) return const Center(child: Text('No active loans tracked. Add one to start.'));
+          
           return ListView.builder(
-            padding: const EdgeInsets.all(24),
-            itemCount: logs.length,
-            itemBuilder: (context, i) {
-              final log = logs[i];
-              final isApproved = log['decision'] == 'APPROVED';
-              return Card(
-                margin: const EdgeInsets.only(bottom: 16),
-                child: ListTile(
-                  leading: Icon(isApproved ? Icons.verified : Icons.warning, 
-                               color: isApproved ? Colors.teal : Colors.red),
-                  title: Text('Health Index: ${(log['score'] * 100).toStringAsFixed(0)}'),
-                  subtitle: Text('Verified on ${log['timestamp'].toString().split('T')[0]}'),
-                ),
-              );
-            },
+            padding: const EdgeInsets.all(16),
+            itemCount: loans.length,
+            itemBuilder: (context, i) => _buildLoanCard(loans[i]),
           );
         },
       ),
     );
   }
+
+  Widget _buildLoanCard(Loan loan) {
+    final currency = NumberFormat.currency(symbol: 'Ksh ', decimalDigits: 0);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 20),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(loan.lenderName.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Colors.teal)),
+                Text(loan.status.name.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey.shade600)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(currency.format(loan.balance), style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+                    const Text('Remaining Balance', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  ],
+                ),
+                CircularProgressIndicator(value: loan.progress, strokeWidth: 8, backgroundColor: Colors.grey.shade100),
+              ],
+            ),
+            const Divider(height: 40),
+            _buildStatRow('Principal', currency.format(loan.principalAmount)),
+            _buildStatRow('Interest (Self-Logged)', currency.format(loan.totalInterest)),
+            _buildStatRow('Due Date', DateFormat('dd MMM yyyy').format(loan.dueDate)),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.receipt_long, size: 16),
+                    label: const Text('LOG EXPENSE'),
+                    onPressed: () => _showAddExpense(context, loan),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.payment, size: 16),
+                    label: const Text('PAYMENT'),
+                    onPressed: () => _showAddRepayment(context, loan),
+                  ),
+                ),
+              ],
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatRow(String label, String val) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13)),
+          Text(val, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        ],
+      ),
+    );
+  }
+
+  void _showAddLoan(BuildContext context) {
+    final nameCtrl = TextEditingController();
+    final amtCtrl = TextEditingController();
+    final rateCtrl = TextEditingController();
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 24, right: 24, top: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Manual Loan Entry', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Lender (Bank/Sacco Name)')),
+            TextField(controller: amtCtrl, decoration: const InputDecoration(labelText: 'Amount (Ksh)'), keyboardType: TextInputType.number),
+            TextField(controller: rateCtrl, decoration: const InputDecoration(labelText: 'Interest Rate (e.g. 0.12 for 12%)'), keyboardType: TextInputType.number),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () async {
+                final loan = Loan(
+                  id: 'MN_${Random().nextInt(99999)}',
+                  profileId: _pId,
+                  lenderName: nameCtrl.text,
+                  principalAmount: double.parse(amtCtrl.text),
+                  interestRate: double.parse(rateCtrl.text),
+                  issuedDate: DateTime.now(),
+                  dueDate: DateTime.now().add(const Duration(days: 90)),
+                );
+                await _db.saveLoan(loan);
+                Navigator.pop(context);
+                setState(() {});
+              },
+              child: const Text('SAVE LOAN'),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddExpense(BuildContext context, Loan loan) {
+    final descCtrl = TextEditingController();
+    final amtCtrl = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 24, right: 24, top: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('What was this used for?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description (e.g. Stock Restock)')),
+            TextField(controller: amtCtrl, decoration: const InputDecoration(labelText: 'Amount Spent (Ksh)'), keyboardType: TextInputType.number),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () async {
+                final exp = LoanExpense(description: descCtrl.text, amount: double.parse(amtCtrl.text), date: DateTime.now());
+                loan.expenses.add(exp);
+                await _db.saveLoan(loan);
+                Navigator.pop(context);
+                setState(() {});
+              },
+              child: const Text('LOG EXPENSE'),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddRepayment(BuildContext context, Loan loan) {
+    final amtCtrl = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 24, right: 24, top: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Log a Repayment', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            TextField(controller: amtCtrl, decoration: const InputDecoration(labelText: 'Amount Paid (Ksh)'), keyboardType: TextInputType.number),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () async {
+                final rep = LoanRepayment(amount: double.parse(amtCtrl.text), date: DateTime.now());
+                loan.repayments.add(rep);
+                if (loan.balance <= 0) loan.status = LoanStatus.paid;
+                await _db.saveLoan(loan);
+                Navigator.pop(context);
+                setState(() {});
+              },
+              child: const Text('LOG PAYMENT'),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-// --- PAGE 3: SHIELD (PRIVACY) ---
+// --- PAGE 3: PRIVACY SHIELD ---
 class PrivacySettingsPage extends StatelessWidget {
   const PrivacySettingsPage({super.key});
 

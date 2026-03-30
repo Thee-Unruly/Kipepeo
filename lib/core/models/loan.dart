@@ -1,55 +1,85 @@
 enum LoanStatus { active, paid, defaulted }
 
+class LoanExpense {
+  final String description;
+  final double amount;
+  final DateTime date;
+
+  LoanExpense({required this.description, required this.amount, required this.date});
+
+  Map<String, dynamic> toMap() => {
+    'description': description,
+    'amount': amount,
+    'date': date.toIso8601String(),
+  };
+
+  factory LoanExpense.fromMap(Map<String, dynamic> map) => LoanExpense(
+    description: map['description'],
+    amount: map['amount'],
+    date: DateTime.parse(map['date']),
+  );
+}
+
+class LoanRepayment {
+  final double amount;
+  final DateTime date;
+
+  LoanRepayment({required this.amount, required this.date});
+
+  Map<String, dynamic> toMap() => {
+    'amount': amount,
+    'date': date.toIso8601String(),
+  };
+
+  factory LoanRepayment.fromMap(Map<String, dynamic> map) => LoanRepayment(
+    amount: map['amount'],
+    date: DateTime.parse(map['date']),
+  );
+}
+
 class Loan {
   final String id;
   final String profileId;
+  final String lenderName; // Added for manual tracking
   final double principalAmount;
-  final double interestRate; // e.g., 0.1 for 10%
-  final double totalToRepay;
-  final double amountPaid;
+  final double interestRate; 
   final DateTime issuedDate;
   final DateTime dueDate;
-  final LoanStatus status;
+  final List<LoanExpense> expenses; // How she used the money
+  final List<LoanRepayment> repayments; // Her repayment track record
+  LoanStatus status;
 
   Loan({
     required this.id,
     required this.profileId,
+    required this.lenderName,
     required this.principalAmount,
     required this.interestRate,
-    required this.totalToRepay,
-    this.amountPaid = 0.0,
     required this.issuedDate,
     required this.dueDate,
+    this.expenses = const [],
+    this.repayments = const [],
     this.status = LoanStatus.active,
   });
 
-  double get remainingBalance => totalToRepay - amountPaid;
+  double get totalInterest => principalAmount * interestRate;
+  double get totalToRepay => principalAmount + totalInterest;
+  double get totalPaid => repayments.fold(0.0, (sum, item) => sum + item.amount);
+  double get balance => totalToRepay - totalPaid;
+  double get progress => totalToRepay > 0 ? (totalPaid / totalToRepay) : 0.0;
+  double get totalSpent => expenses.fold(0.0, (sum, item) => sum + item.amount);
 
   Map<String, dynamic> toMap() {
     return {
       'id': id,
       'profileId': profileId,
+      'lenderName': lenderName,
       'principalAmount': principalAmount,
       'interestRate': interestRate,
-      'totalToRepay': totalToRepay,
-      'amountPaid': amountPaid,
       'issuedDate': issuedDate.toIso8601String(),
       'dueDate': dueDate.toIso8601String(),
       'status': status.name,
+      // We will store these as JSON strings in the DB for simplicity in this prototype
     };
-  }
-
-  factory Loan.fromMap(Map<String, dynamic> map) {
-    return Loan(
-      id: map['id'],
-      profileId: map['profileId'],
-      principalAmount: map['principalAmount'],
-      interestRate: map['interestRate'],
-      totalToRepay: map['totalToRepay'],
-      amountPaid: map['amountPaid'] ?? 0.0,
-      issuedDate: DateTime.parse(map['issuedDate']),
-      dueDate: DateTime.parse(map['dueDate']),
-      status: LoanStatus.values.byName(map['status']),
-    );
   }
 }
