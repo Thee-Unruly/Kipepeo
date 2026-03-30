@@ -126,13 +126,15 @@ class _DashboardPageState extends State<DashboardPage> {
       appBar: AppBar(title: const Text('Financial Passport')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
-        children: [
-          if (_governanceResult != null) _buildPassportCard(),
-          const SizedBox(height: 24),
-          if (_governanceResult != null) _buildProspectusAction(),
-          const SizedBox(height: 24),
-          _buildActionCard(),
-        ],
+        child: Column(
+          children: [
+            if (_governanceResult != null) _buildPassportCard(),
+            const SizedBox(height: 24),
+            if (_governanceResult != null) _buildProspectusAction(),
+            const SizedBox(height: 24),
+            _buildActionCard(),
+          ],
+        ),
       ),
     );
   }
