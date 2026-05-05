@@ -6,10 +6,13 @@ import 'core/services/feature_service.dart';
 import 'core/services/governance_service.dart';
 import 'core/services/differential_privacy_service.dart';
 import 'core/services/prospectus_service.dart';
+import 'core/services/realtime_sms_poller.dart';
 import 'core/models/transaction.dart';
 import 'core/models/credit_profile.dart';
 import 'core/models/loan.dart';
 import 'core/models/user.dart';
+import 'core/screens/onboarding_screen.dart';
+import 'kipepeo_daily_home.dart';
 import 'package:intl/intl.dart';
 import 'dart:math';
 
@@ -50,25 +53,54 @@ class AuthWrapper extends StatefulWidget {
 class _AuthWrapperState extends State<AuthWrapper> {
   User? _currentUser;
   bool _isChecking = true;
+  bool _needsOnboarding = false;
 
   @override
   void initState() {
     super.initState();
+    _checkAuthStatus();
+    // Start real-time SMS polling when app starts
+    realtimeSmsPoller.startPolling(intervalSeconds: 60);
+  }
+
+  Future<void> _checkAuthStatus() async {
+    // Check if user is logged in (you can enhance this with SharedPreferences)
     setState(() => _isChecking = false);
   }
 
   @override
+  void dispose() {
+    realtimeSmsPoller.stopPolling();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (_isChecking)
+    if (_isChecking) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    if (_currentUser == null)
-      return LandingPage(onLogin: (u) => setState(() => _currentUser = u));
-    return MainNavigation(
-      user: _currentUser!,
-      onLogout: () => setState(() => _currentUser = null),
+    }
+    if (_currentUser == null) {
+      return LandingPage(onLogin: (u) {
+        setState(() {
+          _currentUser = u;
+          _needsOnboarding = true; // Assume new users need onboarding
+        });
+      });
+    }
+    if (_needsOnboarding) {
+      return OnboardingScreen(
+        user: _currentUser!,
+        onComplete: () {
+          setState(() => _needsOnboarding = false);
+        },
+      );
+    }
+    // Route to Kipepeo Daily home
+    return KipepeoDailyHomePage(
+      userId: _currentUser!.id,
+      userPhone: _currentUser!.phoneNumber,
     );
   }
-}
 
 // --- AUTH SCREENS ---
 class LandingPage extends StatelessWidget {
