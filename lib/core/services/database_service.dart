@@ -4,6 +4,7 @@ import '../models/transaction.dart';
 import '../models/credit_profile.dart';
 import '../models/loan.dart';
 import '../models/user.dart';
+import '../models/daily_snapshot.dart';
 import 'dart:convert';
 
 class DatabaseService {
@@ -24,7 +25,7 @@ class DatabaseService {
     String path = join(await getDatabasesPath(), 'kipepeo.db');
     return await openDatabase(
       path,
-      version: 9, 
+      version: 10,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -64,7 +65,7 @@ class DatabaseService {
         category TEXT
       )
     ''');
-    
+
     await db.execute('''
       CREATE TABLE profiles(
         id TEXT PRIMARY KEY,
@@ -116,18 +117,67 @@ class DatabaseService {
         repayments TEXT
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE daily_snapshots(
+        id TEXT PRIMARY KEY,
+        user_id TEXT,
+        date TEXT,
+        opening_capital REAL,
+        total_inflow REAL,
+        total_restock_outflow REAL,
+        total_manual_expenses REAL,
+        coefficient_of_variance REAL,
+        red_zone REAL,
+        green_zone REAL,
+        safe_to_spend REAL,
+        ai_nudges TEXT,
+        created_at TEXT,
+        last_updated_at TEXT,
+        is_complete INTEGER,
+        UNIQUE(user_id, date)
+      )
+    ''');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 9) {
-      await db.execute('ALTER TABLE transactions ADD COLUMN category TEXT DEFAULT "General"');
+      await db.execute(
+        'ALTER TABLE transactions ADD COLUMN category TEXT DEFAULT "General"',
+      );
+    }
+    if (oldVersion < 10) {
+      await db.execute('''
+        CREATE TABLE daily_snapshots(
+          id TEXT PRIMARY KEY,
+          user_id TEXT,
+          date TEXT,
+          opening_capital REAL,
+          total_inflow REAL,
+          total_restock_outflow REAL,
+          total_manual_expenses REAL,
+          coefficient_of_variance REAL,
+          red_zone REAL,
+          green_zone REAL,
+          safe_to_spend REAL,
+          ai_nudges TEXT,
+          created_at TEXT,
+          last_updated_at TEXT,
+          is_complete INTEGER,
+          UNIQUE(user_id, date)
+        )
+      ''');
     }
   }
 
   // --- User Methods ---
   Future<void> registerUser(User user) async {
     final db = await database;
-    await db.insert('users', user.toMap(), conflictAlgorithm: ConflictAlgorithm.fail);
+    await db.insert(
+      'users',
+      user.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.fail,
+    );
   }
 
   Future<User?> loginUser(String phoneNumber, String password) async {
@@ -145,7 +195,11 @@ class DatabaseService {
 
   Future<User?> getUser(String id) async {
     final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query('users', where: 'id = ?', whereArgs: [id]);
+    final List<Map<String, dynamic>> maps = await db.query(
+      'users',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
     if (maps.isNotEmpty) return User.fromMap(maps.first);
     return null;
   }
@@ -174,19 +228,30 @@ class DatabaseService {
     final tableName = isAnonymized ? 'anonymized_profiles' : 'profiles';
     final Map<String, dynamic> data = p.toMap();
     data['embedding'] = json.encode(p.embedding);
-    await db.insert(tableName, data, conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert(
+      tableName,
+      data,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   // --- Transaction Methods ---
   Future<void> insertTransaction(MobileTransaction tx) async {
     final db = await database;
-    await db.insert('transactions', tx.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert(
+      'transactions',
+      tx.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   Future<List<MobileTransaction>> getTransactions() async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query('transactions');
-    return List.generate(maps.length, (i) => MobileTransaction.fromMap(maps[i]));
+    return List.generate(
+      maps.length,
+      (i) => MobileTransaction.fromMap(maps[i]),
+    );
   }
 
   Future<void> deleteTransaction(String id) async {
@@ -197,12 +262,19 @@ class DatabaseService {
   // --- Cash Transaction Methods ---
   Future<void> insertCashTransaction(CashTransaction tx) async {
     final db = await database;
-    await db.insert('cash_transactions', tx.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert(
+      'cash_transactions',
+      tx.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   Future<List<CashTransaction>> getCashTransactions() async {
     final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query('cash_transactions', orderBy: 'timestamp DESC');
+    final List<Map<String, dynamic>> maps = await db.query(
+      'cash_transactions',
+      orderBy: 'timestamp DESC',
+    );
     return maps.map((m) => CashTransaction.fromMap(m)).toList();
   }
 
@@ -215,14 +287,26 @@ class DatabaseService {
   Future<void> saveLoan(Loan loan) async {
     final db = await database;
     final Map<String, dynamic> data = loan.toMap();
-    data['expenses'] = json.encode(loan.expenses.map((e) => e.toMap()).toList());
-    data['repayments'] = json.encode(loan.repayments.map((r) => r.toMap()).toList());
-    await db.insert('loans', data, conflictAlgorithm: ConflictAlgorithm.replace);
+    data['expenses'] = json.encode(
+      loan.expenses.map((e) => e.toMap()).toList(),
+    );
+    data['repayments'] = json.encode(
+      loan.repayments.map((r) => r.toMap()).toList(),
+    );
+    await db.insert(
+      'loans',
+      data,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   Future<List<Loan>> getLoansForProfile(String profileId) async {
     final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query('loans', where: 'profileId = ?', whereArgs: [profileId]);
+    final List<Map<String, dynamic>> maps = await db.query(
+      'loans',
+      where: 'profileId = ?',
+      whereArgs: [profileId],
+    );
     return maps.map((m) {
       final List<dynamic> expJson = json.decode(m['expenses'] ?? '[]');
       final List<dynamic> repJson = json.decode(m['repayments'] ?? '[]');
@@ -248,7 +332,12 @@ class DatabaseService {
   }
 
   // --- Audit Methods ---
-  Future<void> insertAuditLog(String pId, double s, bool a, List<String> w) async {
+  Future<void> insertAuditLog(
+    String pId,
+    double s,
+    bool a,
+    List<String> w,
+  ) async {
     final db = await database;
     await db.insert('audit_logs', {
       'profile_id': pId,
@@ -261,6 +350,68 @@ class DatabaseService {
 
   Future<List<Map<String, dynamic>>> getAuditLogs(String profileId) async {
     final db = await database;
-    return await db.query('audit_logs', where: 'profile_id = ?', whereArgs: [profileId], orderBy: 'timestamp DESC');
+    return await db.query(
+      'audit_logs',
+      where: 'profile_id = ?',
+      whereArgs: [profileId],
+      orderBy: 'timestamp DESC',
+    );
+  }
+
+  // --- Daily Snapshot Methods ---
+  Future<void> saveDailySnapshot(DailySnapshot snapshot) async {
+    final db = await database;
+    await db.insert(
+      'daily_snapshots',
+      snapshot.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<DailySnapshot?> getDailySnapshot(String userId, DateTime date) async {
+    final db = await database;
+    final dateStr = date.toIso8601String().split('T')[0];
+    final List<Map<String, dynamic>> maps = await db.query(
+      'daily_snapshots',
+      where: 'user_id = ? AND date = ?',
+      whereArgs: [userId, dateStr],
+    );
+    if (maps.isNotEmpty) {
+      return DailySnapshot.fromMap(maps.first);
+    }
+    return null;
+  }
+
+  Future<List<DailySnapshot>> getLast7DaysSnapshots(String userId) async {
+    final db = await database;
+    final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
+    final List<Map<String, dynamic>> maps = await db.query(
+      'daily_snapshots',
+      where: 'user_id = ? AND date >= ?',
+      whereArgs: [userId, sevenDaysAgo.toIso8601String()],
+      orderBy: 'date DESC',
+      limit: 7,
+    );
+    return maps.map((m) => DailySnapshot.fromMap(m)).toList();
+  }
+
+  Future<List<DailySnapshot>> getAllSnapshotsForUser(String userId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'daily_snapshots',
+      where: 'user_id = ?',
+      whereArgs: [userId],
+      orderBy: 'date DESC',
+    );
+    return maps.map((m) => DailySnapshot.fromMap(m)).toList();
+  }
+
+  Future<void> deleteDailySnapshot(String snapshotId) async {
+    final db = await database;
+    await db.delete(
+      'daily_snapshots',
+      where: 'id = ?',
+      whereArgs: [snapshotId],
+    );
   }
 }
