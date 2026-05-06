@@ -101,12 +101,12 @@ class DailyFuelService {
         .toList();
 
     double mean =
-        restockCosts.fold(0, (sum, val) => sum + val) / restockCosts.length;
+        restockCosts.fold(0.0, (sum, val) => sum + val) / restockCosts.length;
     if (mean == 0) return 0.5;
 
     double variance =
         restockCosts.fold(
-          0,
+          0.0,
           (sum, val) => sum + pow(val - mean, 2).toDouble(),
         ) /
         restockCosts.length;
@@ -142,7 +142,7 @@ class DailyFuelService {
 
     // Calculate 7-day average
     double avg7DayRestock =
-        last7Days.fold(0, (sum, s) => sum + s.totalRestockOutflow) /
+        last7Days.fold(0.0, (sum, s) => sum + s.totalRestockOutflow) /
         last7Days.length;
 
     // Apply formula
@@ -174,7 +174,8 @@ class DailyFuelService {
     // Nudge 2: Low sales day
     double avg7DayInflow = last7Days.isEmpty
         ? 0
-        : last7Days.fold(0, (sum, s) => sum + s.totalInflow) / last7Days.length;
+        : last7Days.fold(0.0, (sum, s) => sum + s.totalInflow) /
+              last7Days.length;
     if (avg7DayInflow > 0 && todayInflow < (avg7DayInflow * 0.7)) {
       nudges.add(
         '📉 Your sales today (KES ${todayInflow.toStringAsFixed(0)}) were 30% below your average. '

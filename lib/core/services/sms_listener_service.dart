@@ -23,7 +23,9 @@ class SmsListenerService {
 
     // Filter messages that arrived after 'since'
     final newMessages = messages.where((msg) {
-      final timestamp = DateTime.fromMillisecondsSinceEpoch(msg.date ?? 0);
+      final timestamp = DateTime.fromMillisecondsSinceEpoch(
+        (msg.date as int?) ?? 0,
+      );
       return timestamp.isAfter(since);
     }).toList();
 

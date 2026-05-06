@@ -6,13 +6,10 @@ import 'core/services/feature_service.dart';
 import 'core/services/governance_service.dart';
 import 'core/services/differential_privacy_service.dart';
 import 'core/services/prospectus_service.dart';
-import 'core/services/realtime_sms_poller.dart';
 import 'core/models/transaction.dart';
 import 'core/models/credit_profile.dart';
 import 'core/models/loan.dart';
 import 'core/models/user.dart';
-import 'core/screens/onboarding_screen.dart';
-import 'kipepeo_daily_home.dart';
 import 'package:intl/intl.dart';
 import 'dart:math';
 
@@ -43,6 +40,7 @@ class KipepeoApp extends StatelessWidget {
   }
 }
 
+// --- AUTH WRAPPER ---
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
 
@@ -53,56 +51,27 @@ class AuthWrapper extends StatefulWidget {
 class _AuthWrapperState extends State<AuthWrapper> {
   User? _currentUser;
   bool _isChecking = true;
-  bool _needsOnboarding = false;
 
   @override
   void initState() {
     super.initState();
-    _checkAuthStatus();
-    // Start real-time SMS polling when app starts
-    realtimeSmsPoller.startPolling(intervalSeconds: 60);
-  }
-
-  Future<void> _checkAuthStatus() async {
-    // Check if user is logged in (you can enhance this with SharedPreferences)
     setState(() => _isChecking = false);
   }
 
   @override
-  void dispose() {
-    realtimeSmsPoller.stopPolling();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    if (_isChecking) {
+    if (_isChecking)
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    if (_currentUser == null) {
-      return LandingPage(onLogin: (u) {
-        setState(() {
-          _currentUser = u;
-          _needsOnboarding = true; // Assume new users need onboarding
-        });
-      });
-    }
-    if (_needsOnboarding) {
-      return OnboardingScreen(
-        user: _currentUser!,
-        onComplete: () {
-          setState(() => _needsOnboarding = false);
-        },
-      );
-    }
-    // Route to Kipepeo Daily home
-    return KipepeoDailyHomePage(
-      userId: _currentUser!.id,
-      userPhone: _currentUser!.phoneNumber,
+    if (_currentUser == null)
+      return LandingPage(onLogin: (u) => setState(() => _currentUser = u));
+    return MainNavigation(
+      user: _currentUser!,
+      onLogout: () => setState(() => _currentUser = null),
     );
   }
+}
 
-// --- AUTH SCREENS ---
+// --- LANDING PAGE ---
 class LandingPage extends StatelessWidget {
   final Function(User) onLogin;
   const LandingPage({super.key, required this.onLogin});
@@ -118,51 +87,21 @@ class LandingPage extends StatelessWidget {
           children: [
             const Icon(Icons.auto_awesome, size: 80, color: Colors.teal),
             const SizedBox(height: 24),
-            const Text(
-              'Kipepeo',
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.w900,
-                color: Colors.teal,
-                letterSpacing: -1,
-              ),
-            ),
-            const Text(
-              'Empowering SMEs Everywhere',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey),
-            ),
+            const Text('Kipepeo', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.teal, letterSpacing: -1)),
+            const Text('Empowering SMEs Everywhere', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
             const SizedBox(height: 60),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.all(18),
-                ),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (c) => LoginPage(onLogin: onLogin),
-                  ),
-                ),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.all(18)),
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (c) => LoginPage(onLogin: onLogin))),
                 child: const Text('LOGIN'),
               ),
             ),
             const SizedBox(height: 16),
             TextButton(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (c) => SignupPage(onLogin: onLogin)),
-              ),
-              child: const Text(
-                'CREATE AN ACCOUNT',
-                style: TextStyle(
-                  color: Colors.teal,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (c) => SignupPage(onLogin: onLogin))),
+              child: const Text('CREATE AN ACCOUNT', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -171,6 +110,7 @@ class LandingPage extends StatelessWidget {
   }
 }
 
+// --- LOGIN PAGE ---
 class LoginPage extends StatefulWidget {
   final Function(User) onLogin;
   const LoginPage({super.key, required this.onLogin});
@@ -187,11 +127,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.teal,
-        elevation: 0,
-      ),
+      appBar: AppBar(backgroundColor: Colors.white, foregroundColor: Colors.teal, elevation: 0),
       body: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
@@ -199,47 +135,23 @@ class _LoginPageState extends State<LoginPage> {
           children: [
             const Icon(Icons.auto_awesome, size: 64, color: Colors.teal),
             const SizedBox(height: 24),
-            const Text(
-              'Welcome Back',
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-            ),
+            const Text('Welcome Back', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
             const SizedBox(height: 32),
-            TextField(
-              controller: phoneCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Phone Number (e.g. 0712...)',
-              ),
-              keyboardType: TextInputType.phone,
-            ),
+            TextField(controller: phoneCtrl, decoration: const InputDecoration(labelText: 'Phone Number (e.g. 0712...)'), keyboardType: TextInputType.phone),
             const SizedBox(height: 16),
-            TextField(
-              controller: passCtrl,
-              decoration: const InputDecoration(labelText: 'Password'),
-              obscureText: true,
-            ),
+            TextField(controller: passCtrl, decoration: const InputDecoration(labelText: 'Password'), obscureText: true),
             const SizedBox(height: 40),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.all(18),
-                ),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.all(18)),
                 onPressed: () async {
-                  final user = await db.loginUser(
-                    phoneCtrl.text,
-                    passCtrl.text,
-                  );
+                  final user = await db.loginUser(phoneCtrl.text, passCtrl.text);
                   if (user != null) {
                     widget.onLogin(user);
                     Navigator.pop(context);
                   } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Invalid phone or password'),
-                      ),
-                    );
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid phone or password')));
                   }
                 },
                 child: const Text('LOGIN'),
@@ -252,6 +164,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 }
 
+// --- SIGNUP PAGE ---
 class SignupPage extends StatefulWidget {
   final Function(User) onLogin;
   const SignupPage({super.key, required this.onLogin});
@@ -270,11 +183,7 @@ class _SignupPageState extends State<SignupPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.teal,
-        elevation: 0,
-      ),
+      appBar: AppBar(backgroundColor: Colors.white, foregroundColor: Colors.teal, elevation: 0),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(32),
         child: Column(
@@ -282,45 +191,21 @@ class _SignupPageState extends State<SignupPage> {
           children: [
             const Icon(Icons.auto_awesome, size: 64, color: Colors.teal),
             const SizedBox(height: 24),
-            const Text(
-              'Join Kipepeo',
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-            ),
-            const Text(
-              'Start building your business identity today.',
-              style: TextStyle(color: Colors.grey),
-            ),
+            const Text('Join Kipepeo', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+            const Text('Start building your business identity today.', style: TextStyle(color: Colors.grey)),
             const SizedBox(height: 32),
-            TextField(
-              controller: nameCtrl,
-              decoration: const InputDecoration(labelText: 'Full Name'),
-            ),
+            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Full Name')),
             const SizedBox(height: 16),
-            TextField(
-              controller: bizCtrl,
-              decoration: const InputDecoration(labelText: 'Business Name'),
-            ),
+            TextField(controller: bizCtrl, decoration: const InputDecoration(labelText: 'Business Name')),
             const SizedBox(height: 16),
-            TextField(
-              controller: phoneCtrl,
-              decoration: const InputDecoration(labelText: 'Phone Number'),
-              keyboardType: TextInputType.phone,
-            ),
+            TextField(controller: phoneCtrl, decoration: const InputDecoration(labelText: 'Phone Number'), keyboardType: TextInputType.phone),
             const SizedBox(height: 16),
-            TextField(
-              controller: passCtrl,
-              decoration: const InputDecoration(labelText: 'Create Password'),
-              obscureText: true,
-            ),
+            TextField(controller: passCtrl, decoration: const InputDecoration(labelText: 'Create Password'), obscureText: true),
             const SizedBox(height: 40),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.all(18),
-                ),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.all(18)),
                 onPressed: () async {
                   if (nameCtrl.text.isEmpty || phoneCtrl.text.isEmpty) return;
                   final user = User(
@@ -356,17 +241,12 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int _selectedIndex = 0;
-
   late final List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
-    _pages = [
-      DashboardPage(user: widget.user),
-      const AuditHistoryPage(),
-      PrivacySettingsPage(onLogout: widget.onLogout),
-    ];
+    _pages = [DashboardPage(user: widget.user), AuditHistoryPage(userId: widget.user.id), PrivacySettingsPage(onLogout: widget.onLogout)];
   }
 
   @override
@@ -375,31 +255,18 @@ class _MainNavigationState extends State<MainNavigation> {
       body: IndexedStack(index: _selectedIndex, children: _pages),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) =>
-            setState(() => _selectedIndex = index),
+        onDestinationSelected: (index) => setState(() => _selectedIndex = index),
         destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.badge_outlined),
-            selectedIcon: Icon(Icons.badge),
-            label: 'Passport',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.account_balance_outlined),
-            selectedIcon: Icon(Icons.account_balance),
-            label: 'My Tracker',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.security_outlined),
-            selectedIcon: Icon(Icons.security),
-            label: 'Privacy',
-          ),
+          NavigationDestination(icon: Icon(Icons.badge_outlined), selectedIcon: Icon(Icons.badge), label: 'Passport'),
+          NavigationDestination(icon: Icon(Icons.account_balance_outlined), selectedIcon: Icon(Icons.account_balance), label: 'My Tracker'),
+          NavigationDestination(icon: Icon(Icons.security_outlined), selectedIcon: Icon(Icons.security), label: 'Privacy'),
         ],
       ),
     );
   }
 }
 
-// --- PAGE 1: PASSPORT HUB ---
+// --- DASHBOARD PAGE ---
 class DashboardPage extends StatefulWidget {
   final User user;
   const DashboardPage({super.key, required this.user});
@@ -879,388 +746,119 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _showVisualReport(BuildContext context) {
-    if (_currentProfile == null || _governanceResult == null) return;
-
-    final profile = _currentProfile!;
-    final gov = _governanceResult!;
-    final score = gov.finalScore;
+    final currency = NumberFormat.currency(symbol: 'Ksh ', decimalDigits: 0);
+    final score = _governanceResult!.finalScore;
     final color = score > 0.7
         ? Colors.teal
         : score > 0.4
         ? Colors.orange
         : Colors.red;
-
-    final currency = NumberFormat.currency(symbol: 'Ksh ', decimalDigits: 0);
-
-    // Dynamic metrics
-    double avgUtilization = 0.0;
-    int onTimeRepayments = 0;
-    double onTimeConsistency = 0.0;
-    int totalRepaymentCount = 0;
-
-    if (_loanHistory.isNotEmpty) {
-      avgUtilization = _loanHistory.fold(0.0, (sum, l) => sum + l.businessUtilization) / _loanHistory.length;
-      
-      for (var loan in _loanHistory) {
-        if (loan.status == LoanStatus.paid) onTimeRepayments++;
-        for (var repayment in loan.repayments) {
-          totalRepaymentCount++;
-          if (repayment.date.isBefore(loan.dueDate.add(const Duration(hours: 24)))) {
-            onTimeConsistency += 1.0;
-          }
-        }
-      }
-      if (totalRepaymentCount > 0) {
-        onTimeConsistency = onTimeConsistency / totalRepaymentCount;
-      } else {
-        onTimeConsistency = 1.0; // Default to 100% if no payments yet to avoid penalty
-      }
-    }
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
       builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.92,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(40)),
-        ),
+        height: MediaQuery.of(context).size.height * 0.9,
         child: Column(
           children: [
-            // Handle for the modal
             Container(
-              margin: const EdgeInsets.only(top: 12),
-              width: 40,
-              height: 4,
+              padding: const EdgeInsets.fromLTRB(32, 40, 32, 24),
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
+                color: Colors.teal.shade50,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(32),
+                ),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Icon(
+                        Icons.account_balance,
+                        color: Colors.teal,
+                        size: 32,
+                      ),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.share_outlined,
+                          color: Colors.teal,
+                        ),
+                        onPressed: () {},
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'BUSINESS IDENTITY REPORT',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 18,
+                      letterSpacing: 2,
+                      color: Colors.teal,
+                    ),
+                  ),
+                  const Text(
+                    'Verified by Kipepeo Engine',
+                    style: TextStyle(
+                      color: Colors.teal,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
             ),
-            
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.all(32),
                 children: [
-                  // --- HEADER ---
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'KIPEPEO IDENTITY',
-                            style: TextStyle(
-                              letterSpacing: 2,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 10,
-                              color: Colors.grey,
-                            ),
-                          ),
-                          Text(
-                            profile.id.substring(0, 12).toUpperCase(),
-                            style: const TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.teal.shade50,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.qr_code_2, color: Colors.teal),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 32),
-                  
-                  // --- TRUST SCORE PASS ---
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(32),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [color.withOpacity(0.1), color.withOpacity(0.02)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(32),
-                      border: Border.all(color: color.withOpacity(0.2)),
-                    ),
-                    child: Column(
+                  _buildReportSection(
+                    'BUSINESS HEALTH',
+                    Column(
                       children: [
-                        const Text(
-                          'BUSINESS TRUST SCORE',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                            letterSpacing: 1.5,
-                            color: Colors.black54,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
                         Text(
-                          (score * 100).toStringAsFixed(0),
+                          score > 0.7
+                              ? "VERY STRONG"
+                              : score > 0.4
+                              ? "STEADY"
+                              : "GROWING",
                           style: TextStyle(
-                            fontSize: 72,
+                            color: color,
+                            fontSize: 24,
                             fontWeight: FontWeight.w900,
-                            color: color,
-                            letterSpacing: -4,
-                          ),
-                        ),
-                        Text(
-                          score > 0.7 ? "VERY STRONG" : score > 0.4 ? "STEADY" : "GROWING",
-                          style: TextStyle(
-                            color: color,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            _buildMiniMetric('RECORDS', profile.transactionCount.toString()),
-                            _buildMiniMetric('HEALTH', '${(profile.riskScore * 10).toStringAsFixed(1)}/10'),
-                            _buildMiniMetric('ON-TIME', '${(onTimeConsistency * 100).toStringAsFixed(0)}%'),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-
-                  // --- PAYMENT RELIABILITY ---
-                  _buildReportSection(
-                    'REPAYMENT PERFORMANCE',
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Payment Early/On-Time Rate',
-                              style: TextStyle(fontWeight: FontWeight.w600),
-                            ),
-                            Text(
-                              '${(onTimeConsistency * 100).toStringAsFixed(0)}%',
-                              style: TextStyle(fontWeight: FontWeight.bold, color: onTimeConsistency > 0.8 ? Colors.teal : Colors.orange),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: LinearProgressIndicator(
-                            value: onTimeConsistency,
-                            minHeight: 10,
-                            backgroundColor: Colors.teal.withOpacity(0.05),
-                            color: onTimeConsistency > 0.8 ? Colors.teal : Colors.orange,
                           ),
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Evidence confirms payments are made on or before the due date.',
-                          style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+                          'Based on ${_currentProfile!.transactionCount} verified records',
+                          style: const TextStyle(color: Colors.grey),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 24),
-
-                  // --- CASHFLOW SUMMARY ---
-                  const Text(
-                    'VERIFIED CASHFLOW (Monthly)',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildValueCard(
-                          'Inflow', 
-                          currency.format(profile.avgMonthlyInflow), 
-                          Colors.teal,
-                          Icons.arrow_downward
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _buildValueCard(
-                          'Outflow', 
-                          currency.format(profile.avgMonthlyOutflow), 
-                          Colors.red,
-                          Icons.arrow_upward
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 32),
-
-                  // --- BUSINESS DISCIPLINE ---
-                  _buildReportSection(
-                    'BUSINESS DISCIPLINE',
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Stock Utilization Efficiency',
-                              style: TextStyle(fontWeight: FontWeight.w600),
-                            ),
-                            Text(
-                              '${(avgUtilization * 100).toStringAsFixed(0)}%',
-                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: LinearProgressIndicator(
-                            value: avgUtilization,
-                            minHeight: 10,
-                            backgroundColor: Colors.teal.withOpacity(0.05),
-                            color: Colors.teal,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Percentage of loans spent directly on business stock and transport.',
-                          style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // --- AI VERIFICATION SEAL ---
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: Colors.grey.shade200),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.verified_user, color: Colors.blue.shade700, size: 28),
-                            const SizedBox(width: 12),
-                            const Text(
-                              'PROJECT ULTRA TRUST SEAL',
-                              style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        ...gov.warnings.isEmpty 
-                          ? [
-                              const _SealTip('✅ AI Audit: No predatory debt traps detected.'),
-                              const _SealTip('✅ Mobile Verifier: Data integrity confirmed.'),
-                              const _SealTip('✅ On-Time: History confirms early payment discipline.'),
-                              const _SealTip('✅ Privacy Guard: Data masked & anonymized.'),
-                            ]
-                          : gov.warnings.map((w) => _SealTip('⚠️ Alert: $w')).toList(),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 48),
                 ],
               ),
             ),
-
-            // --- BOTTOM ACTION ---
             Padding(
               padding: const EdgeInsets.all(32),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.teal,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.all(18),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                        elevation: 0,
-                      ),
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('DOWNLOAD PDF REPORT', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.teal,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.all(16),
                   ),
-                  const SizedBox(width: 12),
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.teal.shade50,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Icon(Icons.share, color: Colors.teal),
-                  ),
-                ],
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('DONE'),
+                ),
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildMiniMetric(String label, String value) {
-    return Column(
-      children: [
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 9, fontWeight: FontWeight.bold)),
-      ],
-    );
-  }
-
-  Widget _buildValueCard(String label, String value, Color color, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.grey.shade100),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 14, color: color),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
-          ),
-        ],
       ),
     );
   }
@@ -1294,825 +892,160 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 }
 
-class _SealTip extends StatelessWidget {
-  final String text;
-  const _SealTip(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(text, style: const TextStyle(fontSize: 12, color: Colors.black87)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 // --- PAGE 2: MY TRACKER ---
 class AuditHistoryPage extends StatefulWidget {
-  const AuditHistoryPage({super.key});
+  final String userId;
+  const AuditHistoryPage({super.key, required this.userId});
 
   @override
   State<AuditHistoryPage> createState() => _AuditHistoryPageState();
 }
 
-class _AuditHistoryPageState extends State<AuditHistoryPage> {
+class _AuditHistoryPageState extends State<AuditHistoryPage> with SingleTickerProviderStateMixin {
   final DatabaseService _db = DatabaseService();
-  final String _pId = 'PROFILE_1';
-
-  late Future<List<Loan>> _loansFuture;
-  late Future<List<dynamic>> _transactionsFuture;
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
-    _refreshData();
-  }
-
-  void _refreshData() {
-    setState(() {
-      _loansFuture = _db.getLoansForProfile(_pId);
-      _transactionsFuture = Future.wait([
-        _db.getTransactions(),
-        _db.getCashTransactions(),
-      ]);
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      // Rebuild the page when the tab changes to update FloatingActionButtons visibility
+      setState(() {}); 
     });
   }
 
   @override
-  Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 3,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('My Tracker'),
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'LOANS'),
-              Tab(text: 'PAYMENTS'),
-              Tab(text: 'HEALTH HISTORY'),
-            ],
-            labelStyle: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-          ),
-        ),
-        body: TabBarView(
-          children: [
-            RefreshIndicator(
-              onRefresh: () async => _refreshData(),
-              child: _buildLoanList(),
-            ),
-            RefreshIndicator(
-              onRefresh: () async => _refreshData(),
-              child: _buildTransactionLedger(),
-            ),
-            RefreshIndicator(
-              onRefresh: () async => _refreshData(),
-              child: _buildAuditLogHistory(),
-            ),
-          ],
-        ),
-        floatingActionButton: Builder(
-          builder: (context) {
-            final tabController = DefaultTabController.of(context);
-            return AnimatedBuilder(
-              animation: tabController,
-              builder: (context, _) {
-                if (tabController.index == 0) {
-                  return FloatingActionButton.extended(
-                    onPressed: () => _showAddLoanModal(context),
-                    label: const Text('Add Loan'),
-                    icon: const Icon(Icons.add_task),
-                    backgroundColor: Colors.teal,
-                    foregroundColor: Colors.white,
-                  );
-                }
-                return const SizedBox.shrink();
-              },
-            );
-          },
-        ),
-      ),
-    );
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
-  void _showAddLoanModal(BuildContext context) {
-    final lenderCtrl = TextEditingController();
-    final amountCtrl = TextEditingController();
-    final rateCtrl = TextEditingController(text: '0.1'); // 10% default
-    DateTime dueDate = DateTime.now().add(const Duration(days: 30));
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-            left: 32,
-            right: 32,
-            top: 32,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'New Loan Record',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 24),
-                TextField(
-                  controller: lenderCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Lender / Source',
-                    hintText: 'e.g. M-Shwari, KCB, Sacco',
-                    prefixIcon: Icon(Icons.business_center),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: amountCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Principal Amount',
-                    prefixText: 'Ksh ',
-                    prefixIcon: Icon(Icons.payments),
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: rateCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Interest Rate (decimal)',
-                    hintText: 'e.g. 0.1 for 10%',
-                    prefixIcon: Icon(Icons.percent),
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 24),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.calendar_today, color: Colors.teal),
-                  title: const Text('Due Date'),
-                  subtitle: Text(DateFormat('yyyy-MM-dd').format(dueDate)),
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: dueDate,
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 365)),
-                    );
-                    if (picked != null) {
-                      setModalState(() => dueDate = picked);
-                    }
-                  },
-                ),
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.teal,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.all(18),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    onPressed: () async {
-                      if (lenderCtrl.text.isEmpty || amountCtrl.text.isEmpty) return;
-                      final loan = Loan(
-                        id: 'LN_${Random().nextInt(999999)}',
-                        profileId: _pId,
-                        lenderName: lenderCtrl.text,
-                        principalAmount: double.parse(amountCtrl.text),
-                        interestRate: double.parse(rateCtrl.text),
-                        issuedDate: DateTime.now(),
-                        dueDate: dueDate,
-                        status: LoanStatus.active,
-                      );
-                      await _db.saveLoan(loan);
-                      if (!mounted) return;
-                      Navigator.pop(context);
-                      _refreshData();
-                    },
-                    child: const Text('SAVE LOAN RECORD'),
-                  ),
-                ),
-                const SizedBox(height: 32),
-              ],
-            ),
-          ),
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('My Tracker'),
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: 'LOANS'),
+            Tab(text: 'PAYMENTS'),
+          ],
         ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [_buildLoanList(), _buildTransactionLedger()],
+      ),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          // Add Loan Button
+          if (_tabController.index == 0) 
+            FloatingActionButton.extended(
+              heroTag: "addLoanFab", // Unique tag
+              icon: const Icon(Icons.add),
+              label: const Text('Add Loan'),
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Add Loan tapped')),
+                );
+                // TODO: Implement add loan dialog
+              },
+            ),
+          
+          // Add spacing if both buttons could be visible (though currently mutually exclusive)
+          if (_tabController.index == 0 && _tabController.index == 1)
+            const SizedBox(height: 16),
+
+          // Add Payment Button
+          if (_tabController.index == 1)
+            FloatingActionButton.extended(
+              heroTag: "addPaymentFab", // Unique tag
+              icon: const Icon(Icons.add),
+              label: const Text('Add Payment'),
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Add Payment tapped')),
+                );
+                // TODO: Implement add payment dialog
+              },
+            ),
+        ],
       ),
     );
   }
 
   Widget _buildLoanList() {
     return FutureBuilder<List<Loan>>(
-      future: _loansFuture,
+      future: _db.getLoansForProfile(widget.userId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return ListView(
-            children: [
-              SizedBox(height: MediaQuery.of(context).size.height * 0.2),
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(48),
-                  child: Column(
-                    children: [
-                      const Icon(Icons.receipt_long, size: 64, color: Colors.grey),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'No loans tracked yet.',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      const Text(
-                        'Add a loan to start tracking your business creditworthiness.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton.icon(
-                        onPressed: () => _showAddLoanModal(context),
-                        icon: const Icon(Icons.add),
-                        label: const Text('Add My First Loan'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.teal.shade50,
-                          foregroundColor: Colors.teal,
-                          elevation: 0,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          );
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
         }
-
         final loans = snapshot.data!;
+        if (loans.isEmpty) return const Center(child: Text('No loans tracked yet. Add one to get started.'));
         return ListView.builder(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(16),
           itemCount: loans.length,
-          itemBuilder: (context, i) {
-            final loan = loans[i];
-            return Card(
-              elevation: 0,
-              margin: const EdgeInsets.only(bottom: 24),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-                side: BorderSide(color: Colors.teal.withOpacity(0.1)),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              loan.lenderName.toUpperCase(),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 13,
-                                letterSpacing: 1.2,
-                                color: Colors.teal,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Due: ${DateFormat('dd MMM yyyy').format(loan.dueDate)}',
-                              style: const TextStyle(
-                                color: Colors.grey,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: loan.status == LoanStatus.active
-                                ? Colors.orange.shade50
-                                : Colors.teal.shade50,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            loan.status.name.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: loan.status == LoanStatus.active
-                                  ? Colors.orange
-                                  : Colors.teal,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Balance',
-                          style: TextStyle(fontWeight: FontWeight.w500),
-                        ),
-                        Text(
-                          'Ksh ${loan.balance.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 18,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: LinearProgressIndicator(
-                        value: loan.progress,
-                        backgroundColor: Colors.teal.withOpacity(0.05),
-                        color: Colors.teal,
-                        minHeight: 8,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Paid: Ksh ${loan.totalPaid.toStringAsFixed(0)}',
-                          style: const TextStyle(color: Colors.grey, fontSize: 11),
-                        ),
-                        Text(
-                          'Total: Ksh ${loan.totalToRepay.toStringAsFixed(0)}',
-                          style: const TextStyle(color: Colors.grey, fontSize: 11),
-                        ),
-                      ],
-                    ),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      child: Divider(height: 1),
-                    ),
-                    SizedBox(
-                      width: double.infinity,
-                      child: TextButton.icon(
-                        onPressed: () => _showLoanDetails(context, loan),
-                        icon: const Icon(Icons.analytics_outlined, size: 18),
-                        label: const Text('MANAGE USE & REPAYMENT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.teal,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          backgroundColor: Colors.teal.shade50.withOpacity(0.5),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
+          itemBuilder: (context, i) => Padding( // Use Padding for margin
+            padding: const EdgeInsets.only(bottom: 20.0),
+            child: _buildLoanCard(loans[i]),
+          ),
         );
       },
-    );
-  }
-
-  void _showLoanDetails(BuildContext context, Loan loan) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => Container(
-          height: MediaQuery.of(context).size.height * 0.9,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        loan.lenderName.toUpperCase(),
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal, letterSpacing: 1),
-                      ),
-                      const Text(
-                        'LOAN PERFORMANCE RECORD',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-                      ),
-                    ],
-                  ),
-                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
-                ],
-              ),
-              const SizedBox(height: 24),
-              // Balance Progress
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.teal.shade50.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Remaining Balance', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                        Text('Ksh ${loan.balance.toStringAsFixed(0)}', 
-                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 24, color: Colors.teal)),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: LinearProgressIndicator(
-                        value: loan.progress,
-                        minHeight: 12,
-                        color: Colors.teal,
-                        backgroundColor: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${(loan.progress * 100).toStringAsFixed(0)}% Repaid',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.black54),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 32),
-              
-              Expanded(
-                child: DefaultTabController(
-                  length: 2,
-                  child: Column(
-                    children: [
-                      const TabBar(
-                        tabs: [
-                          Tab(text: 'USE BREAKDOWN'),
-                          Tab(text: 'REPAYMENTS'),
-                        ],
-                        labelColor: Colors.teal,
-                        unselectedLabelColor: Colors.grey,
-                        indicatorColor: Colors.teal,
-                        labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-                      ),
-                      const SizedBox(height: 16),
-                      Expanded(
-                        child: TabBarView(
-                          children: [
-                            // Use Breakdown Tab
-                            Column(
-                              children: [
-                                Expanded(
-                                  child: loan.expenses.isEmpty 
-                                    ? const Center(child: Text('Add how you used this loan (Stock, Rent, etc.)'))
-                                    : ListView.builder(
-                                        itemCount: loan.expenses.length,
-                                        itemBuilder: (context, i) {
-                                          final e = loan.expenses[i];
-                                          return ListTile(
-                                            leading: const Icon(Icons.shopping_bag, color: Colors.orange),
-                                            title: Text(e.description, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                            subtitle: Text(e.category),
-                                            trailing: Text('Ksh ${e.amount.toStringAsFixed(0)}'),
-                                          );
-                                        },
-                                      ),
-                                ),
-                                ElevatedButton.icon(
-                                  onPressed: () => _addLoanAction(context, loan, true, () => setModalState(() {})),
-                                  icon: const Icon(Icons.add),
-                                  label: const Text('Add Money Use'),
-                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.orange.shade50, foregroundColor: Colors.orange, elevation: 0),
-                                ),
-                              ],
-                            ),
-                            // Repayments Tab
-                            Column(
-                              children: [
-                                Expanded(
-                                  child: loan.repayments.isEmpty 
-                                    ? const Center(child: Text('No repayments recorded yet.'))
-                                    : ListView.builder(
-                                        itemCount: loan.repayments.length,
-                                        itemBuilder: (context, i) {
-                                          final r = loan.repayments[i];
-                                          return ListTile(
-                                            leading: const Icon(Icons.check_circle, color: Colors.teal),
-                                            title: const Text('Loan Repayment'),
-                                            subtitle: Text(DateFormat('dd MMM').format(r.date)),
-                                            trailing: Text('Ksh ${r.amount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                          );
-                                        },
-                                      ),
-                                ),
-                                ElevatedButton.icon(
-                                  onPressed: () => _addLoanAction(context, loan, false, () => setModalState(() {})),
-                                  icon: const Icon(Icons.payments),
-                                  label: const Text('Record Repayment'),
-                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.teal.shade50, foregroundColor: Colors.teal, elevation: 0),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _addLoanAction(BuildContext context, Loan loan, bool isExpense, VoidCallback onUpdate) {
-    final amtCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-    String category = 'Stock';
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 32, right: 32, top: 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(isExpense ? 'Record Loan Use' : 'Record Repayment', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 24),
-              TextField(controller: amtCtrl, decoration: const InputDecoration(labelText: 'Amount (Ksh)'), keyboardType: TextInputType.number),
-              if (isExpense) ...[
-                TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'What was it for?')),
-                const SizedBox(height: 16),
-                DropdownButton<String>(
-                  value: category,
-                  isExpanded: true,
-                  items: ['Stock', 'Transport', 'Rent', 'Wages', 'Other'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                  onChanged: (v) => setModalState(() => category = v!),
-                ),
-              ],
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    if (amtCtrl.text.isEmpty) return;
-                    final amount = double.parse(amtCtrl.text);
-                    if (isExpense) {
-                      loan.expenses.add(LoanExpense(description: descCtrl.text, category: category, amount: amount, date: DateTime.now()));
-                    } else {
-                      loan.repayments.add(LoanRepayment(amount: amount, date: DateTime.now()));
-                      if (loan.balance <= 0) loan.status = LoanStatus.paid;
-                    }
-                    await _db.saveLoan(loan);
-                    Navigator.pop(context);
-                    onUpdate();
-                    _refreshData();
-                  },
-                  child: const Text('SAVE RECORD'),
-                ),
-              ),
-              const SizedBox(height: 32),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAuditLogHistory() {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: _db.getAuditLogs(_pId),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        if (snapshot.data!.isEmpty) return const Center(child: Text('Sync your data to start your health history.'));
-        
-        final logs = snapshot.data!;
-        return Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('REPORTING HISTORY', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1, fontSize: 12)),
-                  TextButton.icon(
-                    onPressed: () => _exportHistoryAsCSV(logs),
-                    icon: const Icon(Icons.file_download_outlined, size: 18),
-                    label: const Text('EXPORT ALL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                    style: TextButton.styleFrom(foregroundColor: Colors.teal),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                itemCount: logs.length,
-                itemBuilder: (context, i) {
-                  final log = logs[i];
-                  final score = (log['score'] as double);
-                  final color = score > 0.7 ? Colors.teal : score > 0.4 ? Colors.orange : Colors.red;
-                  final date = DateTime.parse(log['timestamp']);
-
-                  return Card(
-                    elevation: 0,
-                    margin: const EdgeInsets.only(bottom: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.grey.shade100)),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                      leading: CircleAvatar(
-                        backgroundColor: color.withOpacity(0.1),
-                        child: Text((score * 10).toStringAsFixed(1), style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12)),
-                      ),
-                      title: Text(log['decision'], style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 13)),
-                      subtitle: Text(DateFormat('dd MMMM yyyy, HH:mm').format(date), style: const TextStyle(fontSize: 10)),
-                      trailing: const Icon(Icons.chevron_right, size: 16),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _exportHistoryAsCSV(List<Map<String, dynamic>> logs) async {
-    // Generate CSV Content
-    String csv = "Date,Health Score,Decision\n";
-    for (var log in logs) {
-      csv += "${log['timestamp']},${log['score']},${log['decision']}\n";
-    }
-
-    // Since we are in a demo/agent environment, we show a success message 
-    // In a production app, we would use 'path_provider' and 'share_plus' to save/share the file.
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Export Successful'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Your Business Passport History has been generated as a CSV file.'),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(8)),
-              child: Text(csv, style: const TextStyle(fontFamily: 'monospace', fontSize: 8), maxLines: 5, overflow: TextOverflow.ellipsis),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('CLOSE')),
-          ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('SHARE')),
-        ],
-      ),
     );
   }
 
   Widget _buildTransactionLedger() {
-    return FutureBuilder<List<dynamic>>(
-      future: _transactionsFuture,
+    return FutureBuilder(
+      future: Future.wait([_db.getTransactions(), _db.getCashTransactions()]),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        if (!snapshot.hasData || (snapshot.data![0].isEmpty && snapshot.data![1].isEmpty)) {
-          return const Center(child: Text('No transactions recorded yet.'));
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
         }
-        
         final List<FinancialTransaction> allTxs = [
           ...snapshot.data![0] as List<MobileTransaction>,
           ...snapshot.data![1] as List<CashTransaction>,
         ];
-        
-        allTxs.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+        allTxs.sort((a, b) => b.timestamp.compareTo(a.timestamp)); // Sort by most recent
 
+        if (allTxs.isEmpty) return const Center(child: Text('No business payments verified yet.'));
         return ListView.builder(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(16),
           itemCount: allTxs.length,
           itemBuilder: (context, i) {
             final tx = allTxs[i];
             final isExpense = tx.type == TransactionType.outflow;
-            
-            // Determine the display title and sub-tag
-            String displayTitle = "Transaction";
-            String? subTag;
-            if (tx is MobileTransaction) {
-              displayTitle = tx.sender;
-              subTag = tx.category;
-            } else if (tx is CashTransaction) {
-              displayTitle = tx.description.isNotEmpty ? tx.description : "Cash Record";
-              subTag = tx.category ?? "Cash";
-            }
+            final isCash = tx is CashTransaction;
 
-            return Card(
-              elevation: 0,
-              margin: const EdgeInsets.only(bottom: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: Colors.grey.shade100),
-              ),
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                leading: CircleAvatar(
-                  backgroundColor: isExpense ? Colors.red.shade50 : Colors.teal.shade50,
-                  child: Icon(
-                    isExpense ? Icons.shopping_cart_outlined : Icons.payments_outlined,
-                    color: isExpense ? Colors.red : Colors.teal,
-                    size: 20,
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8.0), // Apply spacing here
+              child: Card(
+                child: ListTile(
+                  leading: Icon(
+                    isExpense ? Icons.shopping_bag : Icons.payments,
+                    color: isExpense ? Colors.red.shade700 : Colors.teal.shade700,
                   ),
-                ),
-                title: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        displayTitle,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (subTag != null)
-                      Container(
-                        margin: const EdgeInsets.only(left: 8),
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          subTag.toUpperCase(),
-                          style: TextStyle(fontSize: 8, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                  ],
-                ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Ksh ${tx.amount.toStringAsFixed(0)}',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900, 
-                        fontSize: 16,
-                        color: isExpense ? Colors.black : Colors.teal.shade700
-                      ),
-                    ),
-                    Text(
-                      DateFormat('dd MMMM, HH:mm').format(tx.timestamp),
-                      style: const TextStyle(fontSize: 10, color: Colors.grey),
-                    ),
-                  ],
-                ),
-                trailing: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isExpense ? Colors.red.shade50 : Colors.teal.shade50,
-                    borderRadius: BorderRadius.circular(8),
+                  title: Text('Ksh ${tx.amount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text(
+                    '${isCash ? "Cash" : "Mobile"} • ${DateFormat('dd MMM yyyy HH:mm').format(tx.timestamp)}',
+                    style: const TextStyle(color: Colors.grey),
                   ),
-                  child: Text(
-                    isExpense ? 'OUT' : 'IN',
-                    style: TextStyle(
-                      color: isExpense ? Colors.red : Colors.teal,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 9,
-                    ),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete_sweep, color: Colors.red, size: 20),
+                    onPressed: () async {
+                      if (isCash) await _db.deleteCashTransaction(tx.id);
+                      else await _db.deleteTransaction(tx.id);
+                      setState(() {}); // Reload data after delete
+                    },
                   ),
                 ),
               ),
@@ -2121,6 +1054,47 @@ class _AuditHistoryPageState extends State<AuditHistoryPage> {
         );
       },
     );
+  }
+
+  Widget _buildLoanCard(Loan loan) {
+    final currency = NumberFormat.currency(symbol: 'Ksh ', decimalDigits: 0);
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Text(loan.lenderName.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Colors.teal)),
+            Text(loan.status.name.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey.shade600)),
+          ]),
+          const SizedBox(height: 16),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(currency.format(loan.balance), style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+              const Text('Money Still to Pay', style: TextStyle(color: Colors.grey, fontSize: 12)),
+            ]),
+            CircularProgressIndicator(value: loan.progress, strokeWidth: 8, backgroundColor: Colors.grey.shade100),
+          ]),
+          const Divider(height: 40),
+          _buildStatRow('Total Loaned', currency.format(loan.principalAmount)),
+          _buildStatRow('Total to Repay', currency.format(loan.totalToRepay)),
+          _buildStatRow('Used for Business', '${(loan.businessUtilization * 100).toStringAsFixed(0)}%'),
+          const SizedBox(height: 20),
+          Row(children: [
+            Expanded(child: OutlinedButton.icon(icon: const Icon(Icons.receipt_long, size: 16), label: const Text('RECORD SPENDING'), onPressed: () {})),
+            const SizedBox(width: 12),
+            Expanded(child: ElevatedButton.icon(icon: const Icon(Icons.payment, size: 16), label: const Text('RECORD PAYMENT'), onPressed: () {})),
+          ])
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildStatRow(String label, String val) {
+    return Padding(padding: const EdgeInsets.only(bottom: 8), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+      Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13)),
+      Text(val, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+    ]));
   }
 }
 
@@ -2133,39 +1107,19 @@ class PrivacySettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('My Safety & Privacy')),
-      body: ListView(
-        padding: const EdgeInsets.all(32),
-        children: [
-          const Text(
-            'Kipepeo keeps your business records safe and private on your phone.',
-            style: TextStyle(color: Colors.grey),
-          ),
-          const SizedBox(height: 32),
-          _buildToggleTile('Privacy Shield', 'Active', true),
-          _buildToggleTile('On-Phone Memory', 'Active', true),
-          const SizedBox(height: 48),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red.shade50,
-              foregroundColor: Colors.red,
-              elevation: 0,
-              padding: const EdgeInsets.all(16),
-            ),
-            onPressed: onLogout,
-            child: const Text('LOGOUT'),
-          ),
-        ],
-      ),
+      body: ListView(padding: const EdgeInsets.all(32), children: [
+        const Text('Kipepeo keeps your business records safe and private on your phone.', style: TextStyle(color: Colors.grey)),
+        const SizedBox(height: 32),
+        _buildToggleTile('Privacy Shield', 'Active', true),
+        _buildToggleTile('On-Phone Memory', 'Active', true),
+        const SizedBox(height: 48),
+        ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade50, foregroundColor: Colors.red, elevation: 0, padding: const EdgeInsets.all(16)), onPressed: onLogout, child: const Text('LOGOUT')),
+      ]),
     );
   }
 
   Widget _buildToggleTile(String title, String sub, bool val) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-      subtitle: Text(sub),
-      trailing: Switch(value: val, onChanged: (v) {}),
-    );
+    return ListTile(contentPadding: EdgeInsets.zero, title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text(sub), trailing: Switch(value: val, onChanged: (v) {}));
   }
 }
 

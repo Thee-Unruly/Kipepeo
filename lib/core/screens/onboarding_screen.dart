@@ -25,7 +25,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final db = DatabaseService();
   final capitalCtrl = TextEditingController();
   bool _smsPermissionGranted = false;
-  int _currentStep = 0; // 0: Intro, 1: Opening Capital, 2: SMS Permission, 3: Done
+  int _currentStep =
+      0; // 0: Intro, 1: Opening Capital, 2: SMS Permission, 3: Done
 
   @override
   Widget build(BuildContext context) {
@@ -100,9 +101,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       children: [
         Text(
           '🦋 Your Daily Business Companion',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
         Text(
@@ -124,16 +125,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       children: [
         Text(
           'How much capital do you have today?',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
         Text(
           'This is the money you use to restock. We\'ll protect this amount in your "Red Zone" so you don\'t accidentally spend it.',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Colors.grey[600],
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
         ),
         const SizedBox(height: 24),
         TextField(
@@ -141,9 +142,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           decoration: InputDecoration(
             labelText: 'Opening Capital (KES)',
             prefixText: 'KES ',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             hintText: 'e.g., 5000',
           ),
           keyboardType: TextInputType.number,
@@ -172,16 +171,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       children: [
         Text(
           'Allow SMS access',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
         Text(
           'Kipepeo reads your M-Pesa messages to automatically track your sales. We ONLY read messages from M-Pesa.',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Colors.grey[600],
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
         ),
         const SizedBox(height: 24),
         Container(
@@ -206,9 +205,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 '• Your messages never leave your phone\n'
                 '• We don\'t store personal texts\n'
                 '• You see exactly which messages we read',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.green[800],
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: Colors.green[800]),
               ),
             ],
           ),
@@ -223,11 +222,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               setState(() => _smsPermissionGranted = true);
             },
             icon: const Icon(Icons.check_circle),
-            label: const Text(
-              _smsPermissionGranted ? 'Permission Granted ✓' : 'Grant Permission',
+            label: Text(
+              _smsPermissionGranted
+                  ? 'Permission Granted ✓'
+                  : 'Grant Permission',
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: _smsPermissionGranted ? Colors.green : Colors.teal,
+              backgroundColor: _smsPermissionGranted
+                  ? Colors.green
+                  : Colors.teal,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.all(16),
             ),
@@ -245,17 +248,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         const SizedBox(height: 24),
         Text(
           'You\'re all set! 🎉',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 16),
         Text(
           'Your Kipepeo Daily dashboard is ready. Check back each day to track your sales and manage your cash flow.',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Colors.grey[600],
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 24),
@@ -279,9 +282,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               const SizedBox(height: 8),
               Text(
                 'After 30 days of tracking, you\'ll unlock your Business Passport to show lenders how serious you are.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.amber[800],
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: Colors.amber[800]),
               ),
             ],
           ),
@@ -296,7 +299,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       child: Row(
         children: [
           const SizedBox(width: 16),
-          Expanded(child: Text(text, style: Theme.of(context).textTheme.bodyMedium)),
+          Expanded(
+            child: Text(text, style: Theme.of(context).textTheme.bodyMedium),
+          ),
         ],
       ),
     );
@@ -325,9 +330,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             backgroundColor: Colors.teal,
             foregroundColor: Colors.white,
           ),
-          child: Text(
-            _currentStep == 3 ? 'Start Using Kipepeo →' : 'Next →',
-          ),
+          child: Text(_currentStep == 3 ? 'Start Using Kipepeo →' : 'Next →'),
         ),
       ],
     );
@@ -335,8 +338,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   bool _canProceed() {
     if (_currentStep == 0) return true; // Intro always valid
-    if (_currentStep == 1) return capitalCtrl.text.isNotEmpty; // Capital must be entered
-    if (_currentStep == 2) return _smsPermissionGranted; // Permission must be granted
+    if (_currentStep == 1)
+      return capitalCtrl.text.isNotEmpty; // Capital must be entered
+    if (_currentStep == 2)
+      return _smsPermissionGranted; // Permission must be granted
     if (_currentStep == 3) return true; // Done step
     return false;
   }

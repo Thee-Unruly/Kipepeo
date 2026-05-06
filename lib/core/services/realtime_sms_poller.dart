@@ -56,10 +56,14 @@ class RealtimeSmsPoller {
   Future<void> _pollForNewMessages() async {
     try {
       // Fetch transactions since last check
-      final newTransactions = await _smsListener.fetchNewTransactionsSince(_lastCheckTime);
+      final newTransactions = await _smsListener.fetchNewTransactionsSince(
+        _lastCheckTime,
+      );
 
       if (newTransactions.isNotEmpty) {
-        print('[RealtimeSmsPoller] Found ${newTransactions.length} new transactions');
+        print(
+          '[RealtimeSmsPoller] Found ${newTransactions.length} new transactions',
+        );
 
         // Save to database
         for (final tx in newTransactions) {
